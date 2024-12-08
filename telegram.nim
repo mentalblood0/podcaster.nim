@@ -1,8 +1,9 @@
-import ytdlp
 import std/options
 import std/sugar
 import std/times
 import std/httpclient
+
+import ytdlp
 
 type Bot* =
   tuple[

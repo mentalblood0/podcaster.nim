@@ -3,6 +3,9 @@
 # by the University of Cambridge, England. Source can be found at
 # ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/
 
+import xxhash
+import nint128
+
 import std/base64
 import std/os
 import std/sugar
@@ -19,8 +22,6 @@ import std/sequtils
 import std/strutils
 import std/osproc
 import std/uri
-
-import xxhash
 
 let page_regex = re"[^\[].*"
 let bandcamp_albums_urls_regexes =
@@ -228,7 +229,8 @@ proc output(p: SplitProcess): Audio =
   p.output_path.remove_file
 
 iterator split_into(a: Audio, parts: int): Audio =
-  let input_name = encode($a.data.XXH3_128bits, safe = true) & ".mp3"
+  let input_name =
+    encode($a.data.XXH3_128bits.to_bytes_b_e, safe = true).replace("=", "") & ".mp3"
   let input_path = temp_files_dir / input_name.Path
   open(input_path.string, fm_write).write a.data
   var processes: seq[SplitProcess]

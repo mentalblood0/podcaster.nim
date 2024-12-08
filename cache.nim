@@ -1,6 +1,10 @@
-import os
 import xxhash
+import nint128
+
+import std/os
 import std/sets
+import std/sugar
+import std/base64
 import std/syncio
 import std/strutils
 
@@ -14,7 +18,7 @@ proc new_cache*(path: string): Cache =
   result.file = path.open fm_write
 
 proc incl*(c: var Cache, m: Media) =
-  let h = $XXH3_128bits $m.url
+  let h = (encode to_bytes_b_e XXH3_128bits $m.url).replace("=", "")
   if h notin c.hashes:
     c.file.write_line h
     c.hashes.incl h
