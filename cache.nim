@@ -5,7 +5,6 @@ import std/os
 import std/sets
 import std/json
 import std/times
-import std/sugar
 import std/base64
 import std/syncio
 import std/strutils

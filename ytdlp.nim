@@ -8,7 +8,6 @@ import nint128
 
 import std/base64
 import std/os
-import std/sugar
 import std/math
 import std/httpclient
 import std/files
@@ -32,12 +31,42 @@ let bandcamp_albums_urls_regexes =
     re"page_url&quot;:&quot;([^&]+)&",
   ]
 let duration_regex = re"time=(?P<hours>\d+):(?P<minutes>\d+):(?P<seconds>\d+)\.\d+"
+let bandcamp_artist_url_regex =
+  re"https?:\/\/(?:\w+\.)?bandcamp\.com(?:\/|(?:\/music\/?))?$"
+let bandcamp_album_url_regex =
+  re"https?:\/\/(?:\w+\.)?bandcamp\.com\/album\/(?:(?:(?:\w|-)+)|(?:-*\d+))\/?$"
+let bandcamp_track_url_regex = re"https?:\/\/(?:\w+\.)?bandcamp\.com\/track\/[^\/]+\/?$"
+let youtube_channel_url_regex =
+  re"https?:\/\/(?:www\.)?youtube\.com\/@?\w+(:?(?:\/?)|(?:\/videos\/?)|(?:\/playlists\/?)|(?:\/streams\/?))$"
+let youtube_playlist_url_regex =
+  re"https?:\/\/(?:www\.)?youtube\.com\/playlist\?list=\w+\/?$"
+let youtube_video_url_regex = re"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=.*$"
 
-var temp_files_dir = "/mnt/tmpfs".Path
+var temp_files_dir* = "/mnt/tmpfs".Path
 
-type Playlist* = tuple[url: Uri, id, title, count, uploader, uploader_id: string]
+type PlaylistKind = enum
+  pBandcampAlbum
+  pBandcampArtist
+  pYoutubePlaylist
+  pYoutubeChannel
 
-proc playlist*(url: Uri): Playlist =
+type Playlist* =
+  tuple[url: Uri, id, title, count, uploader, uploader_id: string, kind: PlaylistKind]
+
+proc new_playlist*(url: Uri): Playlist =
+  if is_some ($url).match bandcamp_album_url_regex:
+    result.kind = pBandcampAlbum
+  elif is_some ($url).match bandcamp_artist_url_regex:
+    result.kind = pBandcampArtist
+  elif is_some ($url).match youtube_channel_url_regex:
+    result.kind = pYoutubeChannel
+  elif is_some ($url).match youtube_playlist_url_regex:
+    result.kind = pYoutubePlaylist
+  else:
+    raise new_exception(
+      ValueError, "No regular expression match supposedly playlist URL \"" & $url & "\""
+    )
+
   const fields = [
     "playlist_id", "playlist_title", "playlist_count", "playlist_uploader",
     "playlist_uploader_id",
@@ -52,14 +81,12 @@ proc playlist*(url: Uri): Playlist =
   let d = to_table fields.zip exec_process(
     "yt-dlp", args = args, options = {po_use_path}
   ).split_lines
-  return (
-    url: url,
-    id: d["playlist_id"],
-    title: d["playlist_title"],
-    count: d["playlist_count"],
-    uploader: d["playlist_uploader"],
-    uploader_id: d["playlist_uploader_id"],
-  )
+  result.url = url
+  result.id = d["playlist_id"]
+  result.title = d["playlist_title"]
+  result.count = d["playlist_count"]
+  result.uploader = d["playlist_uploader"]
+  result.uploader_id = d["playlist_uploader_id"]
 
 proc download_page(url: Uri): string =
   let output_lines = exec_process(
@@ -71,26 +98,29 @@ proc download_page(url: Uri): string =
     if is_some l.match page_regex:
       return decode l
 
-proc get_bandcamp_albums_urls*(url: Uri): OrderedSet[Uri] =
-  let page = download_page url
-  for r in bandcamp_albums_urls_regexes:
-    for m in page.find_iter r:
-      let c = m.captures[0]
-      result.incl block:
-        if c.starts_with "http":
-          parse_uri c
-        else:
-          url / c
-
 iterator items*(playlist: Playlist): Uri =
-  let output_lines = exec_process(
-    "yt-dlp",
-    args = ["--flat-playlist", "--print", "url", $playlist.url],
-    options = {po_use_path},
-  ).split_lines
-  for l in output_lines:
-    if l.starts_with "http":
-      yield parse_uri l
+  if playlist.kind in [pYoutubeChannel, pYoutubeChannel, pBandcampAlbum]:
+    let output_lines = exec_process(
+      "yt-dlp",
+      args = ["--flat-playlist", "--print", "url", $playlist.url],
+      options = {po_use_path},
+    ).split_lines
+    for l in output_lines:
+      if l.starts_with "http":
+        yield parse_uri l
+  elif playlist.kind == pBandcampArtist:
+    let page = download_page playlist.url
+    var result: OrderedSet[Uri]
+    for r in bandcamp_albums_urls_regexes:
+      for m in page.find_iter r:
+        let c = m.captures[0]
+        result.incl block:
+          if c.starts_with "http":
+            parse_uri c
+          else:
+            playlist.url / c
+    for u in result:
+      yield u
 
 type Media* =
   tuple[
@@ -101,7 +131,7 @@ type Media* =
     thumbnail_url: Uri,
   ]
 
-proc media*(url: Uri): Media =
+proc new_media*(url: Uri): Media =
   const fields = ["title", "upload_date", "timestamp", "uploader", "thumbnail"]
   let args = block:
     var r = @["--skip-download"]
@@ -129,6 +159,26 @@ proc media*(url: Uri): Media =
         none(string),
     thumbnail_url: parse_uri d["thumbnail"],
   )
+
+type
+  ParsedKind* = enum
+    pPlaylist
+    pMedia
+
+  Parsed* = ref ParsedObj
+
+  ParsedObj* = object
+    case kind*: ParsedKind
+    of pPlaylist:
+      playlist*: Playlist
+    of pMedia:
+      media*: Media
+
+proc parse*(url: Uri): Parsed =
+  if (($url).match bandcamp_track_url_regex).is_some or
+      (($url).match youtube_video_url_regex).is_some:
+    return Parsed(kind: pMedia, media: new_media url)
+  return Parsed(kind: pPlaylist, playlist: new_playlist url)
 
 type Thumbnail* = distinct string
 

@@ -1,5 +1,4 @@
 import std/options
-import std/sugar
 import std/times
 import std/httpclient
 
@@ -7,23 +6,19 @@ import ytdlp
 
 type Bot* =
   tuple[
-    chat_id: int,
-    token: string,
-    client: HttpClient,
-    max_part_size: int = 1024 * 1024 * 48,
+    chat_id: int, token: string, client: HttpClient, bitrate: int, max_part_size: int
   ]
 
 proc new_bot*(
     chat_id: int,
     token: string,
     client: HttpClient = new_http_client(),
+    bitrate: int = 128,
     max_part_size: int = 1024 * 1024 * 48,
 ): Bot =
-  (chat_id, token, client, max_part_size)
+  (chat_id, token, client, bitrate, max_part_size)
 
 proc upload(b: Bot, a: Audio, title: string, performer: string, thumbnail: Thumbnail) =
-  dump a.duration
-
   var multipart = new_multipart_data()
   multipart["audio"] = (title & ".mp3", "audio/mpeg", a.data)
   multipart["thumbnail"] = ("cover.jpeg", "image/jpeg", thumbnail.string)
@@ -37,8 +32,7 @@ proc upload(b: Bot, a: Audio, title: string, performer: string, thumbnail: Thumb
   )
 
 proc upload*(b: Bot, m: Media) =
-  let a = m.audio 128
-  dump a.duration
+  let a = m.audio b.bitrate
 
   let thumbnail = m.thumbnail(none(int), b.client)
 
