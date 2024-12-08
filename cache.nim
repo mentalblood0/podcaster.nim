@@ -4,6 +4,7 @@ import nint128
 import std/os
 import std/sets
 import std/json
+import std/times
 import std/sugar
 import std/base64
 import std/syncio
@@ -19,7 +20,8 @@ proc new_cache*(path: string): Cache =
   result.file = path.open fm_write
 
 proc incl*(c: var Cache, m: Media) =
-  let id = %*{"uploader": m.uploader, "title": m.title}
+  let id =
+    %*{"uploader": m.uploader, "title": m.title, "uploaded": to_unix to_time m.uploaded}
   let h = (encode to_bytes_b_e XXH3_128bits $id).replace("=", "")
   if h notin c.hashes:
     c.file.write_line h
