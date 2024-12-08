@@ -32,6 +32,8 @@ let bandcamp_albums_urls_regexes =
   ]
 let duration_regex = re"time=(?P<hours>\d+):(?P<minutes>\d+):(?P<seconds>\d+)\.\d+"
 
+var temp_files_dir = "/mnt/tmpfs".Path
+
 type Playlist* = tuple[url: Uri, id, title, count, uploader, uploader_id: string]
 
 proc playlist*(url: Uri): Playlist =
@@ -179,11 +181,7 @@ func size*(a: Audio): int =
   a.data.len
 
 proc convert*(
-    a: Audio,
-    bitrate: int,
-    temp_files_dir: Path = "/mnt/tmpfs".Path,
-    samplerate: int = 44100,
-    channels: int = 2,
+    a: Audio, bitrate: int, samplerate: int = 44100, channels: int = 2
 ): Audio =
   let temp_file_path = temp_files_dir / encode($a.data.XXH3_128bits, safe = true).Path
   let command =
@@ -194,29 +192,52 @@ proc convert*(
   result = new_audio temp_file_path.string.read_file
   temp_file_path.remove_file
 
-iterator split_into(a: Audio, parts: int, temp_files_dir: Path): Audio =
-  let part_seconds = int ceil a.duration.in_seconds / parts
-  let temp_file_path = temp_files_dir / encode($a.data.XXH3_128bits, safe = true).Path
-  open(temp_file_path.string, fm_write).write a.data
-  for i in 0 .. (parts - 1):
-    let start = int floor a.duration.in_seconds / parts * float i
-    let part_temp_file_path = temp_file_path.string & "_" & $(i + 1) & ".mp3"
-    let command =
-      "ffmpeg -y -hide_banner -loglevel error -ss " & $start & " -i " &
-      temp_file_path.string & " -t " & $part_seconds & " -acodec copy " &
-      part_temp_file_path & " 2>&1"
-    dump command
-    let output = exec_cmd_ex(command, {po_use_path})
-    if output[1] != 0:
-      dump output[0]
-    do_assert output[1] == 0
-    let r = new_audio part_temp_file_path.string.read_file
-    part_temp_file_path.remove_file
-    yield r
-  temp_file_path.remove_file
+type SplitProcess = tuple[process: Process, output_path: Path]
 
-iterator split_by_size*(
-    a: Audio, part_size: int, temp_files_dir: Path = "/mnt/tmpfs".Path
-): Audio =
-  for r in a.split((a.size / part_size).ceil.int, temp_files_dir):
+proc start_split_process(
+    total_duration: Duration, total_parts: int, part_index: int, input_name: string
+): SplitProcess =
+  let part_name = input_name & "_" & $(part_index + 1) & ".mp3"
+  return (
+    process: start_process(
+      "ffmpeg",
+      temp_files_dir.string,
+      @[
+        "-y",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-ss",
+        $int floor total_duration.in_seconds / total_parts * float part_index,
+        "-i",
+        input_name,
+        "-t",
+        $int ceil total_duration.in_seconds / total_parts,
+        "-acodec",
+        "copy",
+        part_name,
+      ],
+      options = {po_use_path, po_std_err_to_std_out},
+    ),
+    output_path: temp_files_dir / part_name.Path,
+  )
+
+proc output(p: SplitProcess): Audio =
+  do_assert p.process.wait_for_exit == 0
+  result = new_audio p.output_path.string.read_file
+  p.output_path.remove_file
+
+iterator split_into(a: Audio, parts: int): Audio =
+  let input_name = encode($a.data.XXH3_128bits, safe = true) & ".mp3"
+  let input_path = temp_files_dir / input_name.Path
+  open(input_path.string, fm_write).write a.data
+  var processes: seq[SplitProcess]
+  for i in 0 .. (parts - 1):
+    processes.add start_split_process(a.duration, parts, i, input_name)
+  for p in processes:
+    yield p.output
+  input_path.string.remove_file
+
+iterator split*(a: Audio, part_size: int): Audio =
+  for r in a.split_into int ceil a.size / part_size:
     yield r
