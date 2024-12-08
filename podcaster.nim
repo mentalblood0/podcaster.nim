@@ -1,18 +1,19 @@
 import argparse
 
 import std/uri
-import std/sugar
 import std/httpclient
 
 import telegram
 import ytdlp
 
 proc upload(bot: Bot, url: Uri) =
+  echo url
   let parsed = parse url
   if parsed.kind == pPlaylist:
     for url in parsed.playlist:
       bot.upload url
   elif parsed.kind == pMedia:
+    # return
     bot.upload parsed.media
 
 var parser = new_parser:
@@ -50,7 +51,7 @@ var parser = new_parser:
       required = false,
     )
     option(
-      "-t",
+      "-d",
       "--temp_files_dir",
       "Where to write temporary files directory",
       default = some("/mnt/tmpfs"),
@@ -59,14 +60,14 @@ var parser = new_parser:
     arg("url")
     run:
       let bot = new_bot(
-        chat_id: opts.chat_id,
-        token: opts.token,
-        client: block:
-          if is_some opts.proxy:
-            new_http_client(proxy = new_proxy opts.proxy.get)
+        chat_id = parse_int opts.chat_id,
+        token = opts.token,
+        client = block:
+          if opts.proxy.len > 0:
+            new_http_client(proxy = new_proxy opts.proxy)
           else:
             new_http_client(),
-        bitrate: int opts.bitrate,
+        bitrate = parse_int opts.bitrate,
       )
       bot.upload parse_uri opts.url
 

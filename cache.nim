@@ -4,6 +4,7 @@ import nint128
 import std/os
 import std/sets
 import std/json
+import std/paths
 import std/times
 import std/base64
 import std/syncio
@@ -13,10 +14,10 @@ import ytdlp
 
 type Cache* = tuple[hashes: HashSet[string], file: File]
 
-proc new_cache*(path: string): Cache =
-  if file_exists path:
-    result.hashes = to_hash_set split_lines read_file path
-  result.file = path.open fm_write
+proc new_cache*(path: Path): Cache =
+  if file_exists path.string:
+    result.hashes = to_hash_set split_lines read_file path.string
+  result.file = path.string.open fm_write
 
 proc incl*(c: var Cache, m: Media) =
   let id =
