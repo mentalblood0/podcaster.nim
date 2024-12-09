@@ -1,4 +1,3 @@
-import std/options
 import std/times
 import std/httpclient
 
@@ -18,10 +17,10 @@ proc new_bot*(
 ): Bot =
   (chat_id, token, client, bitrate, max_part_size)
 
-proc upload(b: Bot, a: Audio, title: string, performer: string, thumbnail: Thumbnail) =
+proc upload(b: Bot, a: Audio, title: string, performer: string, thumbnail: string) =
   var multipart = new_multipart_data()
   multipart["audio"] = (title & ".mp3", "audio/mpeg", a.data)
-  multipart["thumbnail"] = ("cover.jpeg", "image/jpeg", thumbnail.string)
+  multipart["thumbnail"] = ("cover.jpeg", "image/jpeg", thumbnail)
   multipart["chat_id"] = $b.chat_id
   multipart["title"] = title
   multipart["performer"] = performer
@@ -34,10 +33,8 @@ proc upload(b: Bot, a: Audio, title: string, performer: string, thumbnail: Thumb
 proc upload*(b: Bot, m: Media) =
   let a = m.audio b.bitrate
 
-  let thumbnail = m.thumbnail(none(int), b.client)
-
   if a.size >= b.max_part_size:
     for a_part in a.split b.max_part_size:
-      b.upload(a_part, m.title, m.uploader.get, thumbnail)
+      b.upload(a_part, m.title, m.uploader, m.thumbnail)
   else:
-    b.upload(m.audio, m.title, m.uploader.get, thumbnail)
+    b.upload(a, m.title, m.uploader, m.thumbnail)

@@ -2,19 +2,11 @@ import argparse
 
 import std/uri
 import std/httpclient
+import std/logging
+import std/strformat
 
 import telegram
 import ytdlp
-
-proc upload(bot: Bot, url: Uri) =
-  echo url
-  let parsed = parse url
-  if parsed.kind == pPlaylist:
-    for url in parsed.playlist:
-      bot.upload url
-  elif parsed.kind == pMedia:
-    # return
-    bot.upload parsed.media
 
 var parser = new_parser:
   command "upload":
@@ -59,6 +51,16 @@ var parser = new_parser:
     )
     arg("url")
     run:
+      proc upload(bot: Bot, url: Uri) =
+        log(lvl_info, &"<-> {url}")
+        let parsed = parse(url, bot.client, 150)
+        if parsed.kind == pPlaylist:
+          for url in parsed.playlist:
+            bot.upload url
+        elif parsed.kind == pMedia:
+          bot.upload parsed.media
+        log(lvl_info, &"+++ {url}")
+
       let bot = new_bot(
         chat_id = parse_int opts.chat_id,
         token = opts.token,
