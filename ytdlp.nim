@@ -276,6 +276,7 @@ proc start_split_process(
 proc output(p: SplitProcess): Audio =
   do_assert p.process.wait_for_exit == 0
   result = new_audio p.output_path.string.read_file
+  p.process.close
   p.output_path.remove_file
 
 iterator split_into(a: Audio, parts: int): Audio =
