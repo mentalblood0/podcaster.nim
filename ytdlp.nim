@@ -13,8 +13,8 @@ import std/os
 import std/exitprocs
 import std/json
 import std/math
+import std/streams
 import std/httpclient
-import std/files
 import std/paths
 import std/times
 import std/nre
@@ -55,6 +55,11 @@ proc new_temp_file(name: string): string =
   let path = string temp_files_dir / name.Path
   temp_files.incl path
   return path
+
+proc new_temp_file(u: Url, postfix: string): string =
+  new_temp_file encode($u.string.XXH3_128bits.to_bytes_b_e, safe = true).replace(
+    "=", ""
+  ) & "_" & postfix
 
 proc remove_temp_files() =
   for p in temp_files:
@@ -145,11 +150,32 @@ iterator items*(playlist: Playlist): Uri =
 
 type Media* =
   tuple[
-    url: Uri, title: string, uploaded: DateTime, uploader: string, thumbnail: string
+    url: Uri,
+    title: string,
+    uploaded: DateTime,
+    uploader: string,
+    thumbnail_path: string,
   ]
 
 func log_string*(m: Media): string =
   &"\"{m.uploader} - {m.title}\""
+
+func hash*(m: Media): string =
+  let id =
+    %*{"uploader": m.uploader, "title": m.title, "uploaded": to_unix to_time m.uploaded}
+  return ($id).XXH3_128bits.to_bytes_b_e.encode(safe = true).replace("=", "")
+
+proc new_temp_file(m: Media, ext: string): string =
+  new_temp_file m.hash.Path.add_file_ext(ext).string
+
+proc execute(command: string, args: seq[string]): string =
+  log(lvl_debug, &"{command} {args}")
+  let p = start_process(command, args = args, options = {po_use_path})
+  try:
+    do_assert p.wait_for_exit == 0
+  except AssertionDefect:
+    log(lvl_warn, p.output_stream.read_all)
+  return p.output_stream.read_all
 
 proc new_media*(url: Uri, client: HttpClient, scale_width: int): Media =
   result.url = url
@@ -162,7 +188,7 @@ proc new_media*(url: Uri, client: HttpClient, scale_width: int): Media =
         r.add k
       r.add $url
       r
-    to_table fields.zip exec_process("yt-dlp", args = args, options = {po_use_path}).split_lines
+    to_table fields.zip split_lines "yt-dlp".execute args
   result.title = dict["title"]
   result.uploader = dict["uploader"]
   result.uploaded = block:
@@ -170,24 +196,25 @@ proc new_media*(url: Uri, client: HttpClient, scale_width: int): Media =
       utc from_unix parse_int dict["timestamp"]
     except ValueError:
       dict["upload_date"].parse "yyyymmdd", utc()
-  result.thumbnail = block:
-    let url = dict["thumbnail"]
-    let hash = url.XXH3_128bits.to_bytes_b_e.encode(safe = true).replace("=", "")
-    let scaled_path = new_temp_file hash & "_scaled.jpg"
+  result.thumbnail_path = block:
+    let url = dict["thumbnail"].replace("https", "http").Url
+    let scaled_path = url.new_temp_file "scaled.png"
     if not scaled_path.file_exists:
-      let original = client.get_content url.replace("https", "http")
-      let original_path = new_temp_file hash & "_original.jpg"
+      let original = client.get_content url.string
+      let original_path = url.new_temp_file "original.jpg"
       open(original_path, fm_write).write original
-      let converted_path = new_temp_file hash & "_converted.jpg"
-      do_assert (
-        &"ffmpeg -y -hide_banner -loglevel error -i {original_path} -f apng {converted_path}"
-      ).exec_cmd_ex.exit_code == 0
-      do_assert (
-        &"ffmpeg -y -hide_banner -loglevel error -i {converted_path} -vf scale={scale_width}:-1 -f apng {scaled_path}"
-      ).exec_cmd_ex.exit_code == 0
-      original_path.remove_file
-      converted_path.remove_file
-    scaled_path.read_file
+      let converted_path = url.new_temp_file "converted.png"
+      discard "ffmpeg".execute @["-i", original_path, "-f", "apng", converted_path]
+      discard "ffmpeg".execute @[
+        "-i",
+        converted_path,
+        "-vf",
+        &"scale={scale_width}:-1",
+        "-f",
+        "apng",
+        scaled_path,
+      ]
+    scaled_path
 
 type
   ParsedKind* = enum
@@ -209,56 +236,44 @@ proc parse*(url: Uri, client: HttpClient, thumbnail_scale_width: int): Parsed =
     return Parsed(kind: pMedia, media: new_media(url, client, thumbnail_scale_width))
   return Parsed(kind: pPlaylist, playlist: new_playlist url)
 
-type Audio* = tuple[data: string, duration: Duration]
+type Audio* = tuple[path: string, duration: Duration, size: int]
 
-func hash(a: Audio): string =
-  encode($a.data.XXH3_128bits.to_bytes_b_e, safe = true).replace("=", "")
+proc new_temp_file(a: Audio, prefix: string): string =
+  return new_temp_file &"{prefix}_{a.path.extract_file_name}"
 
-proc new_audio(data: string): Audio =
-  result.data = data
+proc new_temp_file(a: Audio, part: int): string =
+  return a.new_temp_file &"part{part}"
+
+proc new_audio(path: string): Audio =
+  result.path = path
+  result.size = get_file_size path
   block duration:
-    log(lvl_info, "... duration")
-    let output = exec_cmd_ex(
-      "ffmpeg -i - -f null - 2>&1 | grep time=", {po_use_path}, input = result.data
-    )
-    log(lvl_info, "+++ duration")
-    do_assert output[1] == 0
-    for m in output[0].split_lines[^2].find_iter duration_regex:
+    let output = "ffmpeg".execute @["-i", path, "-f", "null", "-"]
+    for m in output.find_iter duration_regex:
       let hours = parse_int m.captures["hours"]
       let minutes = parse_int m.captures["minutes"]
       let seconds = parse_int m.captures["seconds"]
       result.duration = init_duration(seconds = (hours * 60 + minutes) * 60 + seconds)
 
-proc audio(media: Media, format_arg: string): Audio =
-  log(lvl_info, &"<-- {media.log_string}")
-  let data = exec_process(
-    "yt-dlp", args = ["-f", format_arg, "-o", "-", $media.url], options = {po_use_path}
-  )
-  log(lvl_info, &"+++ {media.log_string}")
-  return new_audio data
-
-proc audio*(media: Media): Audio =
-  audio media, "mp3"
-
-proc audio*(media: Media, kilobits_per_second: int): Audio =
-  let format_arg =
-    "ba[abr<=" & $kilobits_per_second & "]/wa[abr>=" & $kilobits_per_second & "]"
-  audio media, format_arg
-
-func size*(a: Audio): int =
-  a.data.len
+proc audio*(media: Media, kilobits_per_second: Option[int] = none(int)): Audio =
+  let format =
+    if is_some kilobits_per_second:
+      &"ba[abr<={kilobits_per_second.get}]/wa[abr>={kilobits_per_second.get}]"
+    else:
+      "mp3"
+  let temp_path = media.new_temp_file "mp3"
+  discard "yt-dlp".execute @["-f", format, "-o", temp_path, $media.url]
+  return new_audio temp_path
 
 proc convert*(
     a: Audio, bitrate: int, samplerate: int = 44100, channels: int = 2
 ): Audio =
-  let temp_file_path = temp_files_dir / encode($a.data.XXH3_128bits, safe = true).Path
-  let command =
-    "ffmpeg -y -hide_banner -loglevel error -i - -vn -ar " & $samplerate & " -ac " &
-    $channels & " -b:a " & $bitrate & " -o " & temp_file_path.string
-  let output = exec_cmd_ex(command, {po_use_path}, input = a.data)
-  do_assert output[1] == 0
-  result = new_audio temp_file_path.string.read_file
-  temp_file_path.remove_file
+  let converted_path = a.new_temp_file "converted"
+  discard "ffmpeg".execute @[
+    "-i", a.path, "-vn", "-ar", "{samplerate}", "-ac", "{channels}", "-b:a",
+    "{bitrate}", "-o", converted_path,
+  ]
+  return new_audio converted_path
 
 type SplitProcess = tuple[process: Process, output_path: string]
 
@@ -266,46 +281,34 @@ proc start_split_process(
     total_duration: Duration, total_parts: int, part_index: int, input_name: string
 ): SplitProcess =
   let part_path = new_temp_file input_name & "_" & $(part_index + 1) & ".mp3"
-  return (
-    process: start_process(
-      "ffmpeg",
-      args =
-        @[
-          "-y",
-          "-hide_banner",
-          "-loglevel",
-          "error",
-          "-ss",
-          $int floor total_duration.in_seconds / total_parts * float part_index,
-          "-i",
-          new_temp_file input_name,
-          "-t",
-          $int ceil total_duration.in_seconds / total_parts,
-          "-acodec",
-          "copy",
-          part_path,
-        ],
-      options = {po_use_path, po_std_err_to_std_out},
-    ),
-    output_path: part_path,
-  )
-
-proc output(p: SplitProcess): Audio =
-  do_assert p.process.wait_for_exit == 0
-  result = new_audio p.output_path.read_file
-  p.process.close
-  p.output_path.remove_file
 
 iterator split_into(a: Audio, parts: int): Audio =
-  let input_name = a.hash & ".mp3"
-  let input_path = new_temp_file input_name
-  open(input_path, fm_write).write a.data
-  var processes: seq[SplitProcess]
-  for i in 0 .. (parts - 1):
-    processes.add start_split_process(a.duration, parts, i, input_name)
-  for p in processes:
-    yield p.output
-  input_path.string.remove_file
+  let processes = collect:
+    for i in 0 .. (parts - 1):
+      start_process(
+        "ffmpeg",
+        args =
+          @[
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-ss",
+            $int floor a.duration.in_seconds / parts * float i,
+            "-i",
+            a.path,
+            "-t",
+            $int ceil a.duration.in_seconds / parts,
+            "-acodec",
+            "copy",
+            a.new_temp_file i + 1,
+          ],
+        options = {po_use_path, po_std_err_to_std_out},
+      )
+  for i, p in processes:
+    do_assert p.wait_for_exit == 0
+    p.close
+    yield new_audio a.new_temp_file i + 1
 
 iterator split*(a: Audio, part_size: int): Audio =
   for r in a.split_into int ceil a.size / part_size:

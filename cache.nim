@@ -20,9 +20,7 @@ proc new_cache*(path: Path): Cache =
   result.file = path.string.open fm_write
 
 proc incl*(c: var Cache, m: Media) =
-  let id =
-    %*{"uploader": m.uploader, "title": m.title, "uploaded": to_unix to_time m.uploaded}
-  let h = ($id).XXH3_128bits.to_bytes_b_e.encode.replace("=", "")
+  let h = m.hash
   if h notin c.hashes:
     c.file.write_line h
     c.hashes.incl h

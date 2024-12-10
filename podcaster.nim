@@ -45,9 +45,8 @@ var parser = new_parser:
     option(
       "-d",
       "--temp_files_dir",
-      "Where to write temporary files directory",
-      default = some("/mnt/tmpfs"),
-      required = false,
+      "Where to write temporary files. Mount and use tmpfs to minimize hard drive wear",
+      required = true,
     )
     arg("url")
     run:

@@ -1,4 +1,6 @@
 import std/times
+import std/times
+import std/options
 import std/httpclient
 
 import ytdlp
@@ -17,10 +19,11 @@ proc new_bot*(
 ): Bot =
   (chat_id, token, client, bitrate, max_part_size)
 
-proc upload(b: Bot, a: Audio, title: string, performer: string, thumbnail: string) =
+proc upload(
+    b: Bot, a: Audio, title: string, performer: string, thumbnail_path: string
+) =
   var multipart = new_multipart_data()
-  multipart["audio"] = (title & ".mp3", "audio/mpeg", a.data)
-  multipart["thumbnail"] = ("cover.jpeg", "image/jpeg", thumbnail)
+  multipart.add_files {"audio": a.path, "thumbnail": thumbnail_path}
   multipart["chat_id"] = $b.chat_id
   multipart["title"] = title
   multipart["performer"] = performer
@@ -31,10 +34,10 @@ proc upload(b: Bot, a: Audio, title: string, performer: string, thumbnail: strin
   )
 
 proc upload*(b: Bot, m: Media) =
-  let a = m.audio b.bitrate
+  let a = m.audio some(b.bitrate)
 
   if a.size >= b.max_part_size:
     for a_part in a.split b.max_part_size:
-      b.upload(a_part, m.title, m.uploader, m.thumbnail)
+      b.upload(a_part, m.title, m.uploader, m.thumbnail_path)
   else:
-    b.upload(a, m.title, m.uploader, m.thumbnail)
+    b.upload(a, m.title, m.uploader, m.thumbnail_path)
