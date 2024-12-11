@@ -7,7 +7,6 @@ import xxhash
 import nint128
 
 import std/base64
-import std/strtabs
 import std/strformat
 import std/sugar
 import std/os
@@ -170,7 +169,9 @@ proc execute(command: string, args: seq[string]): string =
   result = p.output_stream.read_all
   p.close
 
-proc new_media*(url: Uri, client: HttpClient, scale_width: int): Media =
+proc new_media*(
+    url: Uri, proxy: Option[string] = none(string), scale_width: int
+): Media =
   result.url = url
   let dict = block:
     const fields = ["title", "upload_date", "timestamp", "uploader", "thumbnail"]
@@ -193,19 +194,18 @@ proc new_media*(url: Uri, client: HttpClient, scale_width: int): Media =
     let url = dict["thumbnail"].replace("https", "http").Url
     let scaled_path = url.new_temp_file "scaled.png"
     if not scaled_path.file_exists:
+      let client =
+        if is_some proxy:
+          new_http_client(proxy = new_proxy proxy.get)
+        else:
+          new_http_client()
       let original = client.get_content url.string
       let original_path = url.new_temp_file "original.jpg"
       open(original_path, fm_write).write original
       let converted_path = url.new_temp_file "converted.png"
-      discard "ffmpeg".execute @["-i", original_path, "-f", "apng", converted_path]
+      discard "ffmpeg".execute @["-i", original_path, converted_path]
       discard "ffmpeg".execute @[
-        "-i",
-        converted_path,
-        "-vf",
-        &"scale={scale_width}:-1",
-        "-f",
-        "apng",
-        scaled_path,
+        "-i", converted_path, "-vf", &"scale={scale_width}:-1", scaled_path
       ]
     scaled_path
 
@@ -223,10 +223,10 @@ type
     of pMedia:
       media*: Media
 
-proc parse*(url: Uri, client: HttpClient, thumbnail_scale_width: int): Parsed =
+proc parse*(url: Uri, proxy: Option[string], thumbnail_scale_width: int): Parsed =
   if (($url).match bandcamp_track_url_regex).is_some or
       (($url).match youtube_video_url_regex).is_some:
-    return Parsed(kind: pMedia, media: new_media(url, client, thumbnail_scale_width))
+    return Parsed(kind: pMedia, media: new_media(url, proxy, thumbnail_scale_width))
   return Parsed(kind: pPlaylist, playlist: new_playlist url)
 
 type Audio* = tuple[path: string, duration: Duration, size: int]
