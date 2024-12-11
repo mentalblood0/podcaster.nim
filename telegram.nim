@@ -36,6 +36,7 @@ proc upload(
   discard client.post_content(
     "https://api.telegram.org/bot" & b.token & "/sendAudio", multipart = multipart
   )
+  a.path.remove_file
 
 proc upload*(b: Bot, m: Media) =
   let a = m.audio some(b.bitrate)

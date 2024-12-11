@@ -207,6 +207,8 @@ proc new_media*(
       discard "ffmpeg".execute @[
         "-i", converted_path, "-vf", &"scale={scale_width}:-1", scaled_path
       ]
+      original_path.remove_file
+      converted_path.remove_file
     scaled_path
 
 type
