@@ -27,6 +27,7 @@ import std/uri
 import std/logging
 
 import logging
+import httpclient
 
 let page_regex = re"[^\[].*"
 let bandcamp_albums_urls_regexes =
@@ -169,9 +170,7 @@ proc execute(command: string, args: seq[string]): string =
   result = p.output_stream.read_all
   p.close
 
-proc new_media*(
-    url: Uri, proxy: Option[string] = none(string), scale_width: int
-): Media =
+proc new_media*(url: Uri, scale_width: int): Media =
   result.url = url
   let dict = block:
     const fields = ["title", "upload_date", "timestamp", "uploader", "thumbnail"]
@@ -194,12 +193,7 @@ proc new_media*(
     let url = dict["thumbnail"].replace("https", "http").Url
     let scaled_path = url.new_temp_file "scaled.png"
     if not scaled_path.file_exists:
-      let client =
-        if is_some proxy:
-          new_http_client(proxy = new_proxy proxy.get)
-        else:
-          new_http_client()
-      let original = client.get_content url.string
+      let original = get_ytdlp_http_client().get_content url.string
       let original_path = url.new_temp_file "original.jpg"
       open(original_path, fm_write).write original
       let converted_path = url.new_temp_file "converted.png"
@@ -225,10 +219,10 @@ type
     of pMedia:
       media*: Media
 
-proc parse*(url: Uri, proxy: Option[string], thumbnail_scale_width: int): Parsed =
+proc parse*(url: Uri, thumbnail_scale_width: int): Parsed =
   if (($url).match bandcamp_track_url_regex).is_some or
       (($url).match youtube_video_url_regex).is_some:
-    return Parsed(kind: pMedia, media: new_media(url, proxy, thumbnail_scale_width))
+    return Parsed(kind: pMedia, media: new_media(url, thumbnail_scale_width))
   return Parsed(kind: pPlaylist, playlist: new_playlist url)
 
 type Audio* = tuple[path: string, duration: Duration, size: int]

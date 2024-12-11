@@ -1,22 +1,20 @@
+import std/os
 import std/times
 import std/options
 import std/httpclient
 
 import ytdlp
+import httpclient
 
-type Bot* =
-  tuple[
-    chat_id: int, token: string, proxy: Option[string], bitrate: int, max_part_size: int
-  ]
+type Bot* = tuple[chat_id: int, token: string, bitrate: int, max_part_size: int]
 
 proc new_bot*(
     chat_id: int,
     token: string,
-    proxy: Option[string] = none(string),
     bitrate: int = 128,
     max_part_size: int = 1024 * 1024 * 48,
 ): Bot =
-  (chat_id, token, proxy, bitrate, max_part_size)
+  (chat_id, token, bitrate, max_part_size)
 
 proc upload(
     b: Bot, a: Audio, title: string, performer: string, thumbnail_path: string
@@ -28,14 +26,9 @@ proc upload(
   multipart["performer"] = performer
   multipart["duration"] = $a.duration.in_seconds
 
-  let client =
-    if is_some b.proxy:
-      new_http_client(proxy = new_proxy b.proxy.get)
-    else:
-      new_http_client()
-  discard client.post_content(
-    "https://api.telegram.org/bot" & b.token & "/sendAudio", multipart = multipart
-  )
+  discard get_telegram_http_client().post_content(
+      "https://api.telegram.org/bot" & b.token & "/sendAudio", multipart = multipart
+    )
   a.path.remove_file
 
 proc upload*(b: Bot, m: Media) =

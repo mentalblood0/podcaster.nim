@@ -6,6 +6,7 @@ import std/logging
 import std/strformat
 
 import telegram
+import httpclient
 import ytdlp
 
 var parser = new_parser:
@@ -52,7 +53,7 @@ var parser = new_parser:
     run:
       proc upload(bot: Bot, url: Uri) =
         log(lvl_info, &"<-> {url}")
-        let parsed = parse(url, bot.proxy, 150)
+        let parsed = parse(url, 200)
         if parsed.kind == pPlaylist:
           for url in parsed.playlist:
             bot.upload url
@@ -60,14 +61,15 @@ var parser = new_parser:
           bot.upload parsed.media
         log(lvl_info, &"+++ {url}")
 
+      ytdlp_proxy =
+        if opts.proxy.len > 0:
+          some(opts.proxy)
+        else:
+          none(string)
+
       let bot = new_bot(
         chat_id = parse_int opts.chat_id,
         token = opts.token,
-        proxy =
-          if opts.proxy.len > 0:
-            some(opts.proxy)
-          else:
-            none(string),
         bitrate = parse_int opts.bitrate,
       )
       bot.upload parse_uri opts.url
