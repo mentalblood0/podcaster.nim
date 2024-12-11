@@ -7,6 +7,7 @@ import xxhash
 import nint128
 
 import std/base64
+import std/strtabs
 import std/strformat
 import std/sugar
 import std/os
@@ -74,10 +75,7 @@ type PlaylistKind = enum
   pYoutubePlaylist
   pYoutubeChannel
 
-type Playlist* =
-  tuple[
-    url: Uri, count: int, id, title, uploader, uploader_id: string, kind: PlaylistKind
-  ]
+type Playlist* = tuple[url: Uri, title, uploader: string, kind: PlaylistKind]
 
 proc new_playlist*(url: Uri): Playlist =
   if is_some ($url).match bandcamp_album_url_regex:
@@ -93,10 +91,7 @@ proc new_playlist*(url: Uri): Playlist =
       ValueError, "No regular expression match supposedly playlist URL \"" & $url & "\""
     )
 
-  const fields = [
-    "playlist_id", "playlist_title", "playlist_count", "playlist_uploader",
-    "playlist_uploader_id",
-  ]
+  const fields = ["playlist_title", "playlist_uploader"]
   let args = block:
     var r = @["--skip-download", "--playlist-items", "1"]
     for k in fields:
@@ -108,11 +103,8 @@ proc new_playlist*(url: Uri): Playlist =
     "yt-dlp", args = args, options = {po_use_path}
   ).split_lines
   result.url = url
-  result.id = d["playlist_id"]
   result.title = d["playlist_title"]
-  result.count = parse_int d["playlist_count"]
   result.uploader = d["playlist_uploader"]
-  result.uploader_id = d["playlist_uploader_id"]
 
 proc download_page(url: Uri): string =
   let output_lines = exec_process(
@@ -175,7 +167,8 @@ proc execute(command: string, args: seq[string]): string =
     do_assert p.wait_for_exit == 0
   except AssertionDefect:
     log(lvl_warn, p.output_stream.read_all)
-  return p.output_stream.read_all
+  result = p.output_stream.read_all
+  p.close
 
 proc new_media*(url: Uri, client: HttpClient, scale_width: int): Media =
   result.url = url
@@ -274,13 +267,6 @@ proc convert*(
     "{bitrate}", "-o", converted_path,
   ]
   return new_audio converted_path
-
-type SplitProcess = tuple[process: Process, output_path: string]
-
-proc start_split_process(
-    total_duration: Duration, total_parts: int, part_index: int, input_name: string
-): SplitProcess =
-  let part_path = new_temp_file input_name & "_" & $(part_index + 1) & ".mp3"
 
 iterator split_into(a: Audio, parts: int): Audio =
   let processes = collect:
