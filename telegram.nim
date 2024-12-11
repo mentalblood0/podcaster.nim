@@ -26,9 +26,9 @@ proc upload(
   multipart["performer"] = performer
   multipart["duration"] = $a.duration.in_seconds
 
-  discard get_telegram_http_client().post_content(
-      "https://api.telegram.org/bot" & b.token & "/sendAudio", multipart = multipart
-    )
+  discard telegram_http_client.post_content(
+    "https://api.telegram.org/bot" & b.token & "/sendAudio", multipart = multipart
+  )
   a.path.remove_file
 
 proc upload*(b: Bot, m: Media) =

@@ -1,8 +1,7 @@
 import std/httpclient
 import std/options
 
-proc get_telegram_http_client*(): HttpClient =
-  new_http_client()
+let telegram_http_client* = new_http_client()
 
 var ytdlp_proxy*: Option[string]
 
