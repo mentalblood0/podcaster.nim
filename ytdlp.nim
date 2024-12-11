@@ -158,7 +158,9 @@ func hash*(m: Media): string =
   return ($id).XXH3_128bits.to_bytes_b_e.encode(safe = true).replace("=", "")
 
 proc new_temp_file(m: Media, ext: string): string =
-  new_temp_file m.hash.Path.add_file_ext(ext).string
+  let p = m.hash.Path.add_file_ext(ext).string
+  discard new_temp_file &"{p}.part"
+  return new_temp_file p
 
 proc execute(command: string, args: seq[string]): string =
   log(lvl_debug, &"{command} {args}")
