@@ -169,6 +169,7 @@ proc execute(command: string, args: seq[string]): string =
     do_assert p.wait_for_exit == 0
   except AssertionDefect:
     log(lvl_warn, p.output_stream.read_all)
+    raise
   result = p.output_stream.read_all
   p.close
 
