@@ -4,7 +4,8 @@ import std/options
 import std/httpclient
 
 import ytdlp
-import httpclient
+
+var telegram_http_client* = new_http_client()
 
 type Bot* = tuple[chat_id: int, token: string, bitrate: int, max_part_size: int]
 

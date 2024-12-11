@@ -6,7 +6,6 @@ import std/logging
 import std/strformat
 
 import telegram
-import httpclient
 import ytdlp
 
 var parser = new_parser:
@@ -61,11 +60,7 @@ var parser = new_parser:
           bot.upload parsed.media
         log(lvl_info, &"+++ {url}")
 
-      ytdlp_proxy =
-        if opts.proxy.len > 0:
-          some(opts.proxy)
-        else:
-          none(string)
+      ytdlp_proxy = opts.proxy
 
       let bot = new_bot(
         chat_id = parse_int opts.chat_id,

@@ -9,12 +9,12 @@ import nint128
 import std/base64
 import std/strformat
 import std/sugar
+import std/strtabs
 import std/os
 import std/exitprocs
 import std/json
 import std/math
 import std/streams
-import std/httpclient
 import std/paths
 import std/times
 import std/nre
@@ -27,7 +27,6 @@ import std/uri
 import std/logging
 
 import logging
-import httpclient
 
 let page_regex = re"[^\[].*"
 let bandcamp_albums_urls_regexes =
@@ -47,6 +46,8 @@ let youtube_channel_url_regex =
 let youtube_playlist_url_regex =
   re"https?:\/\/(?:www\.)?youtube\.com\/playlist\?list=\w+\/?$"
 let youtube_video_url_regex = re"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=.*$"
+
+var ytdlp_proxy* = ""
 
 var temp_files_dir* = "/mnt/tmpfs".Path
 var temp_files: HashSet[string]
@@ -164,8 +165,12 @@ proc new_temp_file(m: Media, ext: string): string =
 
 proc execute(command: string, args: seq[string]): string =
   log(lvl_debug, &"{command} {args}")
-  let p =
-    start_process(command, args = args, options = {po_use_path, po_std_err_to_std_out})
+  let p = start_process(
+    command,
+    args = args,
+    options = {po_use_path, po_std_err_to_std_out},
+    env = new_string_table({"http_proxy": ytdlp_proxy, "https_proxy": ytdlp_proxy}),
+  )
   try:
     do_assert p.wait_for_exit == 0
   except AssertionDefect:
@@ -196,13 +201,18 @@ proc new_media*(url: Uri, scale_width: int): Media =
     except ValueError:
       dict["upload_date"].parse "yyyymmdd", utc()
   result.thumbnail_path = block:
-    let url = dict["thumbnail"].replace("https", "http").Url
-    let scaled_path = url.new_temp_file "scaled.png"
+    let thumbnail_url = dict["thumbnail"].Url
+    let scaled_path = thumbnail_url.new_temp_file "scaled.png"
     if not scaled_path.file_exists:
-      let original = get_ytdlp_http_client().get_content url.string
-      let original_path = url.new_temp_file "original.jpg"
-      open(original_path, fm_write).write original
-      let converted_path = url.new_temp_file "converted.png"
+      let original_path = thumbnail_url.new_temp_file "original.jpg"
+      discard "yt-dlp".execute @[
+        $url,
+        "--write-thumbnail",
+        "--skip-download",
+        "-o",
+        $original_path.change_file_ext "",
+      ]
+      let converted_path = thumbnail_url.new_temp_file "converted.png"
       discard "ffmpeg".execute @["-i", original_path, converted_path]
       discard "ffmpeg".execute @[
         "-i", converted_path, "-vf", &"scale={scale_width}:-1", scaled_path
