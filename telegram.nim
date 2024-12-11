@@ -34,7 +34,7 @@ proc upload(
 proc upload*(b: Bot, m: Media) =
   let a = m.audio some(b.bitrate)
 
-  if a.size >= b.max_part_size:
+  if a.path.get_file_size >= b.max_part_size:
     for a_part in a.split b.max_part_size:
       b.upload(a_part, m.title, m.uploader, m.thumbnail_path)
   else:

@@ -37,7 +37,6 @@ let bandcamp_albums_urls_regexes =
     re(";(\\/(?:album|track)\\/[^&\"]+)(?:&|\")"),
     re"page_url&quot;:&quot;([^&]+)&",
   ]
-let duration_regex = re"time=(?P<hours>\d+):(?P<minutes>\d+):(?P<seconds>\d+)\.\d+"
 let bandcamp_artist_url_regex =
   re"https?:\/\/(?:\w+\.)?bandcamp\.com(?:\/|(?:\/music\/?))?$"
 let bandcamp_album_url_regex =
@@ -146,6 +145,7 @@ type Media* =
     title: string,
     uploaded: DateTime,
     uploader: string,
+    duration: Duration,
     thumbnail_path: string,
   ]
 
@@ -164,7 +164,8 @@ proc new_temp_file(m: Media, ext: string): string =
 
 proc execute(command: string, args: seq[string]): string =
   log(lvl_debug, &"{command} {args}")
-  let p = start_process(command, args = args, options = {po_use_path})
+  let p =
+    start_process(command, args = args, options = {po_use_path, po_std_err_to_std_out})
   try:
     do_assert p.wait_for_exit == 0
   except AssertionDefect:
@@ -176,7 +177,8 @@ proc execute(command: string, args: seq[string]): string =
 proc new_media*(url: Uri, scale_width: int): Media =
   result.url = url
   let dict = block:
-    const fields = ["title", "upload_date", "timestamp", "uploader", "thumbnail"]
+    const fields =
+      ["title", "upload_date", "timestamp", "uploader", "duration", "thumbnail"]
     let args = block:
       var r = @["--skip-download"]
       for k in fields:
@@ -187,6 +189,7 @@ proc new_media*(url: Uri, scale_width: int): Media =
     to_table fields.zip split_lines "yt-dlp".execute args
   result.title = dict["title"]
   result.uploader = dict["uploader"]
+  result.duration = init_duration(seconds = int parse_float dict["duration"])
   result.uploaded = block:
     try:
       utc from_unix parse_int dict["timestamp"]
@@ -228,24 +231,13 @@ proc parse*(url: Uri, thumbnail_scale_width: int): Parsed =
     return Parsed(kind: pMedia, media: new_media(url, thumbnail_scale_width))
   return Parsed(kind: pPlaylist, playlist: new_playlist url)
 
-type Audio* = tuple[path: string, duration: Duration, size: int]
+type Audio* = tuple[path: string, duration: Duration]
 
 proc new_temp_file(a: Audio, prefix: string): string =
   return new_temp_file &"{prefix}_{a.path.extract_file_name}"
 
 proc new_temp_file(a: Audio, part: int): string =
   return a.new_temp_file &"part{part}"
-
-proc new_audio(path: string): Audio =
-  result.path = path
-  result.size = get_file_size path
-  block duration:
-    let output = "ffmpeg".execute @["-i", path, "-f", "null", "-"]
-    for m in output.find_iter duration_regex:
-      let hours = parse_int m.captures["hours"]
-      let minutes = parse_int m.captures["minutes"]
-      let seconds = parse_int m.captures["seconds"]
-      result.duration = init_duration(seconds = (hours * 60 + minutes) * 60 + seconds)
 
 proc audio*(media: Media, kilobits_per_second: Option[int] = none(int)): Audio =
   let format =
@@ -255,17 +247,26 @@ proc audio*(media: Media, kilobits_per_second: Option[int] = none(int)): Audio =
       "mp3"
   let temp_path = media.new_temp_file "mp3"
   discard "yt-dlp".execute @["-f", format, "-o", temp_path, $media.url]
-  return new_audio temp_path
+  return (path: temp_path, duration: media.duration)
 
 proc convert*(
-    a: Audio, bitrate: int, samplerate: int = 44100, channels: int = 2
+    a: Audio, bitrate: int = 128, samplerate: int = 44100, channels: int = 2
 ): Audio =
   let converted_path = a.new_temp_file "converted"
   discard "ffmpeg".execute @[
-    "-i", a.path, "-vn", "-ar", "{samplerate}", "-ac", "{channels}", "-b:a",
-    "{bitrate}", "-o", converted_path,
+    "-i",
+    a.path,
+    "-vn",
+    "-ar",
+    $samplerate,
+    "-ac",
+    $channels,
+    "-b:a",
+    $bitrate,
+    converted_path,
   ]
-  return new_audio converted_path
+  a.path.remove_file
+  return (path: converted_path, duration: a.duration)
 
 iterator split_into(a: Audio, parts: int): Audio =
   let processes = collect:
@@ -293,8 +294,12 @@ iterator split_into(a: Audio, parts: int): Audio =
   for i, p in processes:
     do_assert p.wait_for_exit == 0
     p.close
-    yield new_audio a.new_temp_file i + 1
+    yield (
+      path: a.new_temp_file(i + 1),
+      duration: init_duration(seconds = int a.duration.in_seconds / parts),
+    )
+  a.path.remove_file
 
 iterator split*(a: Audio, part_size: int): Audio =
-  for r in a.split_into int ceil a.size / part_size:
+  for r in a.split_into int ceil a.path.get_file_size / part_size:
     yield r
