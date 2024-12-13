@@ -1,4 +1,4 @@
-import std/os
+import std/files
 import std/sets
 import std/paths
 import std/syncio
@@ -9,7 +9,7 @@ import ytdlp
 type Cache* = tuple[hashes: HashSet[string], file: File]
 
 proc new_cache*(path: Path): Cache =
-  if file_exists path.string:
+  if file_exists path:
     result.hashes = to_hash_set split_lines read_file path.string
   result.file = path.string.open fm_write
 

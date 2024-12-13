@@ -1,5 +1,6 @@
 import argparse
 
+import std/files
 import std/uri
 import std/httpclient
 import std/logging
@@ -49,19 +50,34 @@ var parser = new_parser:
       "Where to write temporary files. Mount and use tmpfs to minimize hard drive wear",
       required = true,
     )
+    option(
+      "-l",
+      "--log_level",
+      "Level messages below which will not be outputed",
+      choices = @["debug", "info", "error"],
+      default = some("info"),
+      required = false,
+    )
     arg("url")
     run:
       proc upload(bot: Bot, url: Uri) =
-        log(lvl_info, &"<-> {url}")
+        log(lvl_info, &"<-- {url}")
         let parsed = parse(url, 200)
         if parsed.kind == pPlaylist:
           for url in parsed.playlist:
             bot.upload url
         elif parsed.kind == pMedia:
           bot.upload parsed.media
-        log(lvl_info, &"+++ {url}")
 
       ytdlp_proxy = opts.proxy
+
+      case opts.log_level
+      of "debug":
+        set_log_filter lvl_debug
+      of "info":
+        set_log_filter lvl_info
+      of "error":
+        set_log_filter lvl_error
 
       let bot = new_bot(
         chat_id = parse_int opts.chat_id,
