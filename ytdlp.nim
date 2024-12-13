@@ -9,6 +9,7 @@ import nint128
 import std/base64
 import std/strformat
 import std/sugar
+import std/algorithm
 import std/strtabs
 import std/os
 import std/exitprocs
@@ -116,11 +117,15 @@ proc download_page(url: Uri): string =
     if is_some l.match page_regex:
       return decode l
 
-iterator items*(playlist: Playlist): Uri =
+iterator items*(playlist: Playlist, reverse_order: bool = false): Uri =
   if playlist.kind in [pYoutubeChannel, pYoutubeChannel, pBandcampAlbum]:
     let output_lines = exec_process(
       "yt-dlp",
-      args = ["--flat-playlist", "--print", "url", $playlist.url],
+      args = block:
+        var a = @["--flat-playlist", "--print", "url", $playlist.url]
+        if reverse_order:
+          a &= @["--playlist-items", "::-1"]
+        a,
       options = {po_use_path},
     ).split_lines
     for l in output_lines:
@@ -128,16 +133,19 @@ iterator items*(playlist: Playlist): Uri =
         yield parse_uri l
   elif playlist.kind == pBandcampArtist:
     let page = download_page playlist.url
-    var result: OrderedSet[Uri]
-    for r in bandcamp_albums_urls_regexes:
-      for m in page.find_iter r:
-        let c = m.captures[0]
-        result.incl block:
-          if c.starts_with "http":
-            parse_uri c
-          else:
-            playlist.url / c
-    for u in result:
+    var urls = block:
+      var u: OrderedSet[Uri]
+      for r in bandcamp_albums_urls_regexes:
+        for m in page.find_iter r:
+          let c = m.captures[0]
+          u.incl block:
+            if c.starts_with "http":
+              parse_uri c
+            else:
+              playlist.url / c
+      u.to_seq
+    reverse urls
+    for u in urls:
       yield u
 
 type Media* =
