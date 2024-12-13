@@ -37,6 +37,7 @@ let bandcamp_albums_urls_regexes =
     re(";(\\/(?:album|track)\\/[^&\"]+)(?:&|\")"),
     re"page_url&quot;:&quot;([^&]+)&",
   ]
+let bandcamp_url_regex = re"https?:\/\/(?:\w+\.)?bandcamp\.com.*$"
 let bandcamp_artist_url_regex =
   re"https?:\/\/(?:\w+\.)?bandcamp\.com(?:\/|(?:\/music\/?))?$"
 let bandcamp_album_url_regex =
@@ -47,6 +48,9 @@ let youtube_channel_url_regex =
 let youtube_playlist_url_regex =
   re"https?:\/\/(?:www\.)?youtube\.com\/playlist\?list=\w+\/?$"
 let youtube_video_url_regex = re"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=.*$"
+
+proc is_bandcamp_url*(url: Uri): bool =
+  is_some ($url).match bandcamp_url_regex
 
 var ytdlp_proxy* = ""
 
@@ -70,13 +74,17 @@ proc remove_temp_files() =
 add_exit_proc remove_temp_files
 set_control_c_hook () {.noconv.} => quit()
 
-type PlaylistKind = enum
+type PlaylistKind* = enum
   pBandcampAlbum
   pBandcampArtist
   pYoutubePlaylist
   pYoutubeChannel
 
 type Playlist* = tuple[url: Uri, title, uploader: string, kind: PlaylistKind]
+
+func hash*(p: Playlist): string =
+  let id = %*{"title": p.title, "uploader": p.uploader}
+  return ($id).XXH3_128bits.to_bytes_b_e.encode(safe = true).replace("=", "")
 
 proc new_playlist*(url: Uri): Playlist =
   if is_some ($url).match bandcamp_album_url_regex:

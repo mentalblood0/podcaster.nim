@@ -1,9 +1,9 @@
 import argparse
 
-import std/files
 import std/uri
 import std/httpclient
 import std/logging
+import std/paths
 import std/strformat
 
 import telegram
@@ -60,14 +60,29 @@ var parser = new_parser:
     )
     arg("url")
     run:
+      var cache = new_cache opts.cache
+
       proc upload(bot: Bot, url: Uri) =
+        let is_bandcamp = is_bandcamp_url url
+        if is_bandcamp and (url in cache):
+          return
         log(lvl_info, &"<-- {url}")
         let parsed = parse(url, 200)
         if parsed.kind == pPlaylist:
           for url in parsed.playlist:
-            bot.upload url
-        elif parsed.kind == pMedia:
+            if is_bandcamp and url notin cache:
+              bot.upload url
+              cache.incl url
+            else:
+              bot.upload url
+          if is_bandcamp:
+            cache.incl url
+        elif parsed.kind == pMedia and parsed.media notin cache:
           bot.upload parsed.media
+          if is_bandcamp:
+            cache.incl url
+          else:
+            cache.incl parsed.media
 
       ytdlp_proxy = opts.proxy
 
