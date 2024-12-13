@@ -150,12 +150,8 @@ type Media* =
     thumbnail_path: string,
   ]
 
-func log_string*(m: Media): string =
-  &"\"{m.uploader} - {m.title}\""
-
 func hash*(m: Media): string =
-  let id =
-    %*{"uploader": m.uploader, "title": m.title, "uploaded": to_unix to_time m.uploaded}
+  let id = %*{"title": m.title, "uploaded": to_unix to_time m.uploaded}
   return ($id).XXH3_128bits.to_bytes_b_e.encode(safe = true).replace("=", "")
 
 proc new_temp_file(m: Media, ext: string): string =
@@ -182,8 +178,7 @@ proc execute(command: string, args: seq[string]): string =
 proc new_media*(url: Uri, scale_width: int): Media =
   result.url = url
   let dict = block:
-    const fields =
-      ["title", "upload_date", "timestamp", "uploader", "duration", "thumbnail"]
+    const fields = ["title", "upload_date", "timestamp", "duration", "thumbnail"]
     let args = block:
       var r = @["--skip-download"]
       for k in fields:
@@ -193,7 +188,6 @@ proc new_media*(url: Uri, scale_width: int): Media =
       r
     to_table fields.zip split_lines "yt-dlp".execute args
   result.title = dict["title"]
-  result.uploader = dict["uploader"]
   result.duration = init_duration(seconds = int parse_float dict["duration"])
   result.uploaded = block:
     try:
