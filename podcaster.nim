@@ -7,6 +7,7 @@ import std/strformat
 
 import telegram
 import ytdlp
+import cache
 
 var parser = new_parser:
   command "upload":
