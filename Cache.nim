@@ -1,21 +1,26 @@
-import std/files
-import std/uri
-import std/dirs
-import std/appdirs
-import std/sets
-import std/paths
-import std/syncio
-import std/strformat
-import std/logging
-import std/strutils
+# Regular expression support is provided by the PCRE library package,
+# which is open source software, written by Philip Hazel, and copyright
+# by the University of Cambridge, England. Source can be found at
+# ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/
+
+import
+  std/
+    [files, uri, dirs, appdirs, sets, paths, syncio, strformat, logging, strutils, nre]
 
 import ytdlp
 
 type Cache* = tuple[hashes: HashSet[string], path: Path]
 
-proc new_cache*(uri: Uri): Cache =
+proc cache_file_name(url: Uri): string =
+  if is_bandcamp_url(url):
+    return url.hostname
+  let m = ($url).match youtube_channel_url_regex
+  if is_some m:
+    return m.get.captures[0]
+
+proc new_cache*(url: Uri): Cache =
   result.path =
-    (get_data_dir() / "podcaster".Path / uri.hostname.Path).change_file_ext "txt"
+    (get_data_dir() / "podcaster".Path / url.cache_file_name.Path).change_file_ext "txt"
   log(lvl_debug, &"new cache at {result.path.string}")
   if file_exists result.path:
     result.hashes = to_hash_set split_lines read_file result.path.string

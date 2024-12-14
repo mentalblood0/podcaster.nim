@@ -1,14 +1,8 @@
-import std/files
-import std/sets
-import std/uri
-import std/paths
-import std/sequtils
-import std/options
-import std/strutils
-import std/cmdline
-import std/logging
-import std/strformat
-import std/envvars
+import
+  std/[
+    files, sets, uri, paths, sequtils, options, strutils, cmdline, logging, strformat,
+    envvars,
+  ]
 
 import ytdlp
 import Cache
@@ -56,7 +50,7 @@ proc upload*(podcaster: var Podcaster, url: Uri): seq[Path] =
           break
         except BandcampError:
           return
-        except SslUnexpectedEofError:
+        except SslUnexpectedEofError, UnableToConnectToProxyError:
           continue
       r
     podcaster.uploader.upload(audio, parsed.media.title, parsed.media.thumbnail_path)

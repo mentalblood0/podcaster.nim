@@ -6,48 +6,34 @@
 import xxhash
 import nint128
 
-import std/base64
-import std/strformat
-import std/sugar
-import std/algorithm
-import std/strtabs
-import std/os
-import std/exitprocs
-import std/json
-import std/math
-import std/streams
-import std/paths
-import std/times
-import std/nre
-import std/sets
-import std/tables
-import std/sequtils
-import std/strutils
-import std/osproc
-import std/uri
-import std/logging
+import
+  std/[
+    base64, strformat, sugar, algorithm, strtabs, os, exitprocs, json, math, streams,
+    paths, times, nre, sets, tables, sequtils, strutils, osproc, uri, logging,
+  ]
 
 import logging
 
-let page_regex = re"[^\[].*"
-let bandcamp_albums_urls_regexes =
+let page_regex* = re"[^\[].*"
+let bandcamp_albums_urls_regexes* =
   @[
     re("href=\"([^&\\n]+)&amp;tab=music"),
     re("\"(\\/(?:album|track)\\/[^\"]+)\""),
     re(";(\\/(?:album|track)\\/[^&\"]+)(?:&|\")"),
     re"page_url&quot;:&quot;([^&]+)&",
   ]
-let bandcamp_url_regex = re"https?:\/\/(?:\w+\.)?bandcamp\.com.*$"
-let bandcamp_artist_url_regex =
+let bandcamp_url_regex* = re"https?:\/\/(?:\w+\.)?bandcamp\.com.*$"
+let bandcamp_artist_url_regex* =
   re"https?:\/\/(?:\w+\.)?bandcamp\.com(?:\/|(?:\/music\/?))?$"
-let bandcamp_album_url_regex =
+let bandcamp_album_url_regex* =
   re"https?:\/\/(?:\w+\.)?bandcamp\.com\/album\/(?:(?:(?:\w|-)+)|(?:-*\d+))\/?$"
-let bandcamp_track_url_regex = re"https?:\/\/(?:\w+\.)?bandcamp\.com\/track\/[^\/]+\/?$"
-let youtube_channel_url_regex =
-  re"https?:\/\/(?:www\.)?youtube\.com\/@?\w+(:?(?:\/?)|(?:\/videos\/?)|(?:\/playlists\/?)|(?:\/streams\/?))$"
-let youtube_playlist_url_regex =
+let bandcamp_track_url_regex* =
+  re"https?:\/\/(?:\w+\.)?bandcamp\.com\/track\/[^\/]+\/?$"
+let youtube_channel_url_regex* =
+  re"https?:\/\/(?:www\.)?youtube\.com\/@?(\w+)(:?(?:\/?)|(?:\/videos\/?)|(?:\/playlists\/?)|(?:\/streams\/?))$"
+let youtube_playlist_url_regex* =
   re"https?:\/\/(?:www\.)?youtube\.com\/playlist\?list=\w+\/?$"
-let youtube_video_url_regex = re"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=.*$"
+let youtube_video_url_regex* = re"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=.*$"
 
 proc is_bandcamp_url*(url: Uri): bool =
   is_some ($url).match bandcamp_url_regex
@@ -80,6 +66,7 @@ type
   BandcampNoVideoFormatsFoundError* = object of BandcampError
   BandcampNoTracksOnPageError* = object of BandcampError
   SslUnexpectedEofError* = object of AssertionDefect
+  UnableToConnectToProxyError* = object of AssertionDefect
 
 proc check_substring_exceptions(command_output: string) =
   if "ERROR: [Bandcamp] 1235306164: No video formats found!;" in command_output:
@@ -89,10 +76,13 @@ proc check_substring_exceptions(command_output: string) =
     raise new_exception(BandcampNoTracksOnPageError, command_output)
   if "SSL: UNEXPECTED_EOF_WHILE_READING" in command_output:
     raise new_exception(SslUnexpectedEofError, command_output)
+  if "Unable to connect to proxy" in command_output:
+    raise new_exception(UnableToConnectToProxyError, command_output)
   raise
 
 proc execute(command: string, args: seq[string]): string =
-  log(lvl_debug, &"{command} {args}")
+  let command_string = command & " " & args.map((a: string) => &"'{a}'").join(" ")
+  log(lvl_debug, command_string)
   let p = start_process(
     command,
     args = args,
@@ -103,7 +93,6 @@ proc execute(command: string, args: seq[string]): string =
     do_assert p.wait_for_exit == 0
   except AssertionDefect:
     result = p.output_stream.read_all
-    let command_string = command & " " & args.join(" ")
     log(lvl_warn, &"command '{command_string}' failed:\n{result}")
     check_substring_exceptions(result)
     raise

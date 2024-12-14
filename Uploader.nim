@@ -1,10 +1,4 @@
-import std/uri
-import std/os
-import std/times
-import std/enumerate
-import std/httpclient
-import std/logging
-import std/strformat
+import std/[uri, os, times, enumerate, httpclient, logging, strformat]
 
 import ytdlp
 
