@@ -21,11 +21,17 @@ proc upload*(podcaster: var Podcaster, url: Uri): seq[Path] =
   if is_bandcamp and (url in podcaster.cache):
     return
 
-  let parsed =
-    try:
-      parse(url)
-    except BandcampError:
-      return
+  let parsed = block:
+    var r: Parsed
+    while true:
+      try:
+        r = parse(url)
+        break
+      except BandcampError, DurationNotAvailableError:
+        break
+      except SslUnexpectedEofError, UnableToConnectToProxyError:
+        continue
+    r
 
   if parsed.kind == pPlaylist:
     if parsed.playlist.kind notin [pBandcampArtist, pYoutubeChannel]:
@@ -54,7 +60,7 @@ proc upload*(podcaster: var Podcaster, url: Uri): seq[Path] =
           r = podcaster.downloader.download parsed.media
           break
         except BandcampError, DurationNotAvailableError:
-          return
+          break
         except SslUnexpectedEofError, UnableToConnectToProxyError:
           continue
       r
