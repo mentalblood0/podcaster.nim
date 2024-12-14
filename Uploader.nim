@@ -1,6 +1,7 @@
 import std/uri
 import std/os
 import std/times
+import std/enumerate
 import std/httpclient
 import std/logging
 import std/strformat
@@ -15,8 +16,8 @@ type Uploader* = tuple[token: string, chat_id: int]
 
 proc upload*(uploader: Uploader, a: Audio, title: string, thumbnail_path: string) =
   if a.path.get_file_size >= max_uploaded_audio_size:
-    for a_part in a.split max_uploaded_audio_size:
-      uploader.upload(a_part, title, thumbnail_path)
+    for i, a_part in enumerate a.split max_uploaded_audio_size:
+      uploader.upload(a_part, &"{title} - {i}", thumbnail_path)
     return
 
   var multipart = new_multipart_data()
