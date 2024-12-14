@@ -84,7 +84,7 @@ proc check_substring_exceptions(command_output: string) =
 type CommandProcess = tuple[command: string, args: seq[string], process: Process]
 
 func command_string(p: CommandProcess): string =
-  p.command & " " & p.args.map((a: string) => &"'{a}'").join(" ")
+  p.command & " " & p.args.map(quote_shell).join(" ")
 
 proc new_command_process(command: string, args: seq[string]): CommandProcess =
   result = (
