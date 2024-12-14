@@ -1,4 +1,5 @@
 import std/files
+import std/sets
 import std/uri
 import std/paths
 import std/sequtils
@@ -14,7 +15,8 @@ import Cache
 import Downloader
 import Uploader
 
-type Podcaster* = tuple[cache: Cache, downloader: Downloader, uploader: Uploader]
+type Podcaster* =
+  tuple[cache: Cache, downloader: Downloader, uploader: Uploader, reverse_order: bool]
 
 proc remove_thumbnails(paths: seq[Path]) =
   for p in paths:
@@ -34,16 +36,15 @@ proc upload*(podcaster: var Podcaster, url: Uri): seq[Path] =
   if parsed.kind == pPlaylist:
     if parsed.playlist.kind notin [pBandcampArtist, pYoutubeChannel]:
       log(lvl_info, &"<-- {parsed.playlist.uploader} - {parsed.playlist.title}")
-
-    var thumbnails_to_remove: seq[Path]
-    for url in parsed.playlist:
-      if is_bandcamp and url notin podcaster.cache:
-        thumbnails_to_remove &= podcaster.upload url
-        podcaster.cache.incl url
-      else:
-        thumbnails_to_remove &= podcaster.upload url
-    remove_thumbnails thumbnails_to_remove
-
+    remove_thumbnails block:
+      var r: seq[Path]
+      for url in parsed.playlist.items podcaster.reverse_order:
+        if is_bandcamp and url notin podcaster.cache:
+          r &= podcaster.upload url
+          podcaster.cache.incl url
+        else:
+          r &= podcaster.upload url
+      r
     if is_bandcamp and parsed.playlist.kind != pBandcampArtist:
       podcaster.cache.incl url
   elif parsed.kind == pMedia and parsed.media notin podcaster.cache:
@@ -76,8 +77,10 @@ when is_main_module:
     let chat_id = parse_int splitted_arg[0]
     let url = parse_uri splitted_arg[1]
 
+    let cache = new_cache url
+
     var podcaster = (
-      cache: new_cache url,
+      cache: cache,
       downloader: (
         bitrate: block:
           let bitrate_env = get_env "podcaster_download_bitrate"
@@ -94,6 +97,7 @@ when is_main_module:
             none(ConversionParams),
       ),
       uploader: (token: get_env "podcaster_token", chat_id: chat_id),
+      reverse_order: cache.hashes.len == 0,
     )
 
     try:
