@@ -28,7 +28,8 @@ proc upload*(podcaster: var Podcaster, url: Uri): seq[Path] =
   let parsed = parse(url, 200)
 
   if parsed.kind == pPlaylist:
-    log(lvl_info, &"<-- {parsed.playlist.uploader} - {parsed.playlist.title}")
+    if parsed.playlist.kind notin [pBandcampArtist, pYoutubeChannel]:
+      log(lvl_info, &"<-- {parsed.playlist.uploader} - {parsed.playlist.title}")
 
     var thumbnails_to_remove: seq[Path]
     for url in parsed.playlist:
