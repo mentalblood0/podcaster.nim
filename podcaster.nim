@@ -1,3 +1,4 @@
+import std/files
 import std/uri
 import std/paths
 import std/sequtils
@@ -15,21 +16,29 @@ import Uploader
 
 type Podcaster* = tuple[cache: Cache, downloader: Downloader, uploader: Uploader]
 
-proc upload*(podcaster: var Podcaster, url: Uri) =
+proc remove_thumbnails(paths: seq[Path]) =
+  for p in paths:
+    p.remove_file
+
+proc upload*(podcaster: var Podcaster, url: Uri): seq[Path] =
   let is_bandcamp = is_bandcamp_url url
   if is_bandcamp and (url in podcaster.cache):
     return
 
-  log(lvl_info, &"<-- {url}")
   let parsed = parse(url, 200)
 
   if parsed.kind == pPlaylist:
+    log(lvl_info, &"<-- {parsed.playlist.uploader} - {parsed.playlist.title}")
+
+    var thumbnails_to_remove: seq[Path]
     for url in parsed.playlist:
       if is_bandcamp and url notin podcaster.cache:
-        podcaster.upload url
+        thumbnails_to_remove &= podcaster.upload url
         podcaster.cache.incl url
       else:
-        podcaster.upload url
+        thumbnails_to_remove &= podcaster.upload url
+    remove_thumbnails thumbnails_to_remove
+
     if is_bandcamp and parsed.playlist.kind != pBandcampArtist:
       podcaster.cache.incl url
   elif parsed.kind == pMedia and parsed.media notin podcaster.cache:
@@ -39,6 +48,7 @@ proc upload*(podcaster: var Podcaster, url: Uri) =
       podcaster.cache.incl url
     else:
       podcaster.cache.incl parsed.media
+    result.add parsed.media.thumbnail_path.Path
 
 when is_main_module:
   ytdlp_proxy = get_env "podcaster_http_proxy"
@@ -78,7 +88,7 @@ when is_main_module:
     )
 
     try:
-      podcaster.upload url
+      discard podcaster.upload url
     except:
       remove_temp_files()
       raise
