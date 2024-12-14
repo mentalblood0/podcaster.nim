@@ -28,6 +28,8 @@ proc upload*(podcaster: var Podcaster, url: Uri): seq[Path] =
         r = parse(url)
         break
       except BandcampError, DurationNotAvailableError:
+        if is_bandcamp:
+          podcaster.cache.incl url
         return
       except SslUnexpectedEofError, UnableToConnectToProxyError:
         continue
@@ -53,18 +55,22 @@ proc upload*(podcaster: var Podcaster, url: Uri): seq[Path] =
         return
       return
     let audio = block:
-      var r: Audio
+      var r: Option[Audio]
       while true:
         try:
           podcaster.downloader.download_thumbnail parsed.media
-          r = podcaster.downloader.download parsed.media
+          r = some(podcaster.downloader.download parsed.media)
           break
         except BandcampError, DurationNotAvailableError:
-          return
+          r = none(Audio)
+          break
         except SslUnexpectedEofError, UnableToConnectToProxyError:
           continue
       r
-    podcaster.uploader.upload(audio, parsed.media.title, parsed.media.thumbnail_path)
+    if is_some(audio):
+      podcaster.uploader.upload(
+        audio.get, parsed.media.title, parsed.media.thumbnail_path
+      )
     if is_bandcamp:
       podcaster.cache.incl url
     else:
