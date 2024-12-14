@@ -186,7 +186,7 @@ proc execute(command: string, args: seq[string]): string =
   try:
     do_assert p.wait_for_exit == 0
   except AssertionDefect:
-    log(lvl_warn, p.output_stream.read_all)
+    log(lvl_warn, &"{command} {args} failed:\n{p.output_stream.read_all}")
     raise
   result = p.output_stream.read_all
   p.close
@@ -270,20 +270,20 @@ proc audio*(media: Media, kilobits_per_second: Option[int] = none(int)): Audio =
   discard "yt-dlp".execute @["-f", format, "-o", temp_path, $media.url]
   return (path: temp_path, duration: media.duration)
 
-proc convert*(
-    a: Audio, bitrate: int = 128, samplerate: int = 44100, channels: int = 2
-): Audio =
+type ConversionParams* = tuple[bitrate: int, samplerate: int, channels: int]
+
+proc convert*(a: Audio, cp: ConversionParams = (128, 44100, 2)): Audio =
   let converted_path = a.new_temp_file "converted"
   discard "ffmpeg".execute @[
     "-i",
     a.path,
     "-vn",
     "-ar",
-    $samplerate,
+    $cp.samplerate,
     "-ac",
-    $channels,
+    $cp.channels,
     "-b:a",
-    $bitrate,
+    $cp.bitrate,
     converted_path,
   ]
   a.path.remove_file

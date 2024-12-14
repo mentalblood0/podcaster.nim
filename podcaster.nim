@@ -13,7 +13,7 @@ import cache
 var parser = new_parser:
   command "upload":
     option(
-      "-c",
+      "-ch",
       "--chat_id",
       "Telegram chat id, you can forward message from chat to @getidsbot to get chat's id",
       required = true,
@@ -22,33 +22,35 @@ var parser = new_parser:
       "-t",
       "--token",
       "Telegram bot token, use @BotFather to create bot and get it's token",
-      required = true,
-    )
-    option(
-      "-C",
-      "--cache",
-      "Path to cache file used to not retrieve and upload media repeatedly",
-      required = true,
+      env = "podcaster_token",
+      required = false,
     )
     option(
       "-p",
       "--proxy",
       "Address of HTTP proxy to use",
-      env = "http_proxy",
+      env = "podcaster_http_proxy",
       required = false,
     )
     option(
       "-b",
       "--bitrate",
-      "Preferable audio bitrate",
+      "Preferable downloaded audio bitrate",
       default = some("128"),
+      required = false,
+    )
+    option(
+      "-co",
+      "--convert",
+      "Conversion of downloaded audio according to given bitrate:samplerate:channels",
       required = false,
     )
     option(
       "-d",
       "--temp_files_dir",
       "Where to write temporary files. Mount and use tmpfs to minimize hard drive wear",
-      required = true,
+      env = "podcaster_temp_dir",
+      required = false,
     )
     option(
       "-l",
@@ -60,7 +62,8 @@ var parser = new_parser:
     )
     arg("url")
     run:
-      var cache = new_cache opts.cache
+      let url_arg = parse_uri opts.url
+      var cache = new_cache url_arg
 
       proc upload(bot: Bot, url: Uri) =
         let is_bandcamp = is_bandcamp_url url
@@ -94,11 +97,17 @@ var parser = new_parser:
       of "error":
         set_log_filter lvl_error
 
-      let bot = new_bot(
-        chat_id = parse_int opts.chat_id,
-        token = opts.token,
-        bitrate = parse_int opts.bitrate,
+      let bot = (
+        chat_id: parse_int opts.chat_id,
+        token: opts.token,
+        download_bitrate: parse_int opts.bitrate,
+        conversion_params:
+          if opts.convert.len > 0:
+            let splitted = opts.convert.split(':').map parse_int
+            some (bitrate: splitted[0], samplerate: splitted[1], channels: splitted[2])
+          else:
+            none(ConversionParams),
       )
-      bot.upload parse_uri opts.url
+      bot.upload url_arg
 
 parser.run

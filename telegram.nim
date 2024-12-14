@@ -1,10 +1,6 @@
-# Regular expression support is provided by the PCRE library package,
-# which is open source software, written by Philip Hazel, and copyright
-# by the University of Cambridge, England. Source can be found at
-# ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/
-
 import std/os
-import std/nre
+import std/appdirs
+import std/options
 import std/times
 import std/options
 import std/strutils
@@ -14,17 +10,17 @@ import std/logging
 
 import ytdlp
 
+const max_uploaded_audio_size = 1024 * 1024 * 48
+
 var telegram_http_client* = new_http_client()
 
-type Bot* = tuple[chat_id: int, token: string, bitrate: int, max_part_size: int]
-
-proc new_bot*(
+type Bot* =
+  tuple[
     chat_id: int,
     token: string,
-    bitrate: int = 128,
-    max_part_size: int = 1024 * 1024 * 48,
-): Bot =
-  (chat_id, token, bitrate, max_part_size)
+    download_bitrate: int,
+    conversion_params: Option[ConversionParams],
+  ]
 
 proc upload(b: Bot, a: Audio, title: string, thumbnail_path: string) =
   var multipart = new_multipart_data()
@@ -40,10 +36,14 @@ proc upload(b: Bot, a: Audio, title: string, thumbnail_path: string) =
   a.path.remove_file
 
 proc upload*(b: Bot, m: Media) =
-  let a = m.audio some(b.bitrate)
+  let a = block:
+    if is_some b.conversion_params:
+      (m.audio some b.download_bitrate).convert b.conversion_params.get
+    else:
+      m.audio some b.download_bitrate
 
-  if a.path.get_file_size >= b.max_part_size:
-    for a_part in a.split b.max_part_size:
+  if a.path.get_file_size >= max_uploaded_audio_size:
+    for a_part in a.split max_uploaded_audio_size:
       b.upload(a_part, m.title, m.thumbnail_path)
   else:
     b.upload(a, m.title, m.thumbnail_path)
