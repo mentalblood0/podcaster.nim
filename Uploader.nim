@@ -11,7 +11,7 @@ type Uploader* = tuple[token: string, chat_id: string]
 proc upload*(uploader: Uploader, a: Audio, title: string, thumbnail_path: string) =
   if a.path.get_file_size >= max_uploaded_audio_size:
     for i, a_part in enumerate a.split max_uploaded_audio_size:
-      uploader.upload(a_part, &"{title} - {i}", thumbnail_path)
+      uploader.upload(a_part, &"{title} - {i + 1}", thumbnail_path)
     return
 
   var multipart = new_multipart_data()

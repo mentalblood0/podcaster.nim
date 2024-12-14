@@ -80,24 +80,37 @@ proc check_substring_exceptions(command_output: string) =
     raise new_exception(UnableToConnectToProxyError, command_output)
   raise
 
-proc execute(command: string, args: seq[string]): string =
-  let command_string = command & " " & args.map((a: string) => &"'{a}'").join(" ")
-  log(lvl_debug, command_string)
-  let p = start_process(
-    command,
-    args = args,
-    options = {po_use_path, po_std_err_to_std_out},
-    env = new_string_table({"http_proxy": ytdlp_proxy, "https_proxy": ytdlp_proxy}),
+type CommandProcess = tuple[command: string, args: seq[string], process: Process]
+
+func command_string(p: CommandProcess): string =
+  p.command & " " & p.args.map((a: string) => &"'{a}'").join(" ")
+
+proc new_command_process(command: string, args: seq[string]): CommandProcess =
+  result = (
+    command: command,
+    args: args,
+    process: start_process(
+      command,
+      args = args,
+      options = {po_use_path, po_std_err_to_std_out},
+      env = new_string_table({"http_proxy": ytdlp_proxy, "https_proxy": ytdlp_proxy}),
+    ),
   )
+  log(lvl_debug, result.command_string)
+
+proc wait_for_exit(p: CommandProcess): string =
   try:
-    do_assert p.wait_for_exit == 0
+    do_assert p.process.wait_for_exit == 0
   except AssertionDefect:
-    result = p.output_stream.read_all
-    log(lvl_warn, &"command '{command_string}' failed:\n{result}")
+    result = p.process.output_stream.read_all
+    log(lvl_warn, &"command '{p.command_string}' failed:\n{result}")
     check_substring_exceptions(result)
     raise
-  result = p.output_stream.read_all
-  p.close
+  result = p.process.output_stream.read_all
+  p.process.close
+
+proc execute(command: string, args: seq[string]): string =
+  wait_for_exit command.new_command_process args
 
 type PlaylistKind* = enum
   pBandcampAlbum
@@ -274,7 +287,7 @@ proc audio*(media: Media, kilobits_per_second: Option[int] = none(int)): Audio =
       &"ba[abr<={kilobits_per_second.get}]/wa[abr>={kilobits_per_second.get}]"
     else:
       "mp3"
-  let temp_path = media.new_temp_file "mp3"
+  let temp_path = media.new_temp_file ""
   log(lvl_info, &"<-- {media.title}")
   discard "yt-dlp".execute @["-f", format, "-o", temp_path, $media.url]
   return (path: temp_path, duration: media.duration)
@@ -282,7 +295,7 @@ proc audio*(media: Media, kilobits_per_second: Option[int] = none(int)): Audio =
 type ConversionParams* = tuple[bitrate: int, samplerate: int, channels: int]
 
 proc convert*(a: Audio, cp: ConversionParams = (128, 44100, 2)): Audio =
-  let converted_path = a.new_temp_file "converted"
+  let converted_path = a.new_temp_file("converted").add_file_ext "mp3"
   discard "ffmpeg".execute @[
     "-i",
     a.path,
@@ -301,33 +314,23 @@ proc convert*(a: Audio, cp: ConversionParams = (128, 44100, 2)): Audio =
 iterator split_into(a: Audio, parts: int): Audio =
   let processes = collect:
     for i in 0 .. (parts - 1):
-      start_process(
-        "ffmpeg",
-        args =
-          @[
-            "-y",
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-ss",
-            $int floor a.duration.in_seconds / parts * float i,
-            "-i",
-            a.path,
-            "-t",
-            $int ceil a.duration.in_seconds / parts,
-            "-acodec",
-            "copy",
-            a.new_temp_file i + 1,
-          ],
-        options = {po_use_path, po_std_err_to_std_out},
-      )
+      "ffmpeg".new_command_process @[
+        "-y",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-ss",
+        $int floor a.duration.in_seconds / parts * float i,
+        "-i",
+        a.path,
+        "-t",
+        $int ceil a.duration.in_seconds / parts,
+        "-acodec",
+        "copy",
+        a.new_temp_file i + 1,
+      ]
   for i, p in processes:
-    try:
-      do_assert p.wait_for_exit == 0
-    except AssertionDefect:
-      log(lvl_warn, p.output_stream.read_all)
-      raise
-    p.close
+    discard p.wait_for_exit
     yield (
       path: a.new_temp_file(i + 1),
       duration: init_duration(seconds = int a.duration.in_seconds / parts),
