@@ -46,11 +46,11 @@ proc upload*(podcaster: var Podcaster, url: Uri): seq[Path] =
       if not podcaster.reverse_order and not is_bandcamp:
         return
       return
-    podcaster.downloader.download_thumbnail parsed.media
     let audio = block:
       var r: Audio
       while true:
         try:
+          podcaster.downloader.download_thumbnail parsed.media
           r = podcaster.downloader.download parsed.media
           break
         except BandcampError:

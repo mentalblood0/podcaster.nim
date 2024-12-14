@@ -235,24 +235,25 @@ proc new_media*(url: Uri): Media =
   result.thumbnail_path = result.thumbnail_url.new_temp_file "scaled.png"
 
 proc download_thumbnail*(media: Media, scale_width: int) =
-  if not media.thumbnail_path.file_exists:
-    let possible_original_paths = ["jpg", "webp"].map (e: string) =>
-      media.thumbnail_url.new_temp_file "original." & e
-    discard "yt-dlp".execute @[
-      $media.url,
-      "--write-thumbnail",
-      "--skip-download",
-      "-o",
-      $possible_original_paths[0].change_file_ext "",
-    ]
-    let original_path = possible_original_paths.filter(file_exists)[0]
-    let converted_path = media.thumbnail_url.new_temp_file "converted.png"
-    discard "ffmpeg".execute @["-i", original_path, converted_path]
-    discard "ffmpeg".execute @[
-      "-i", converted_path, "-vf", &"scale={scale_width}:-1", media.thumbnail_path
-    ]
-    original_path.remove_file
-    converted_path.remove_file
+  if media.thumbnail_path.file_exists:
+    return
+  let possible_original_paths =
+    ["jpg", "webp"].map (e: string) => media.thumbnail_url.new_temp_file "original." & e
+  discard "yt-dlp".execute @[
+    $media.url,
+    "--write-thumbnail",
+    "--skip-download",
+    "-o",
+    $possible_original_paths[0].change_file_ext "",
+  ]
+  let original_path = possible_original_paths.filter(file_exists)[0]
+  let converted_path = media.thumbnail_url.new_temp_file "converted.png"
+  discard "ffmpeg".execute @["-i", original_path, converted_path]
+  discard "ffmpeg".execute @[
+    "-i", converted_path, "-vf", &"scale={scale_width}:-1", media.thumbnail_path
+  ]
+  original_path.remove_file
+  converted_path.remove_file
 
 type
   ParsedKind* = enum
