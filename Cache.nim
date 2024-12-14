@@ -12,10 +12,12 @@ import ytdlp
 type Cache* = tuple[hashes: HashSet[string], path: Path]
 
 proc cache_file_name(url: Uri): string =
-  if is_bandcamp_url(url):
-    return url.hostname
-  let m = ($url).match youtube_channel_url_regex
-  if is_some m:
+  block bandcamp:
+    let m = ($url).match bandcamp_url_regex
+    if is_some m:
+      return m.get.captures[0]
+  block youtube:
+    let m = ($url).match youtube_channel_url_regex
     return m.get.captures[0]
 
 proc new_cache*(url: Uri): Cache =

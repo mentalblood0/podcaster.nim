@@ -22,7 +22,7 @@ let bandcamp_albums_urls_regexes* =
     re(";(\\/(?:album|track)\\/[^&\"]+)(?:&|\")"),
     re"page_url&quot;:&quot;([^&]+)&",
   ]
-let bandcamp_url_regex* = re"https?:\/\/(?:\w+\.)?bandcamp\.com.*$"
+let bandcamp_url_regex* = re"https?:\/\/(?:(\w|-)+\.)?bandcamp\.com.*$"
 let bandcamp_artist_url_regex* =
   re"https?:\/\/(?:(?:\w|-)+\.)?bandcamp\.com(?:\/|(?:\/music\/?))?$"
 let bandcamp_album_url_regex* =
