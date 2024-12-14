@@ -25,7 +25,7 @@ proc upload*(uploader: Uploader, a: Audio, title: string, thumbnail_path: string
   multipart["title"] = title
   multipart["duration"] = $a.duration.in_seconds
 
-  log(lvl_info, &"multipart is:\n{multipart}")
+  log(lvl_debug, &"multipart is:\n{multipart}")
 
   log(lvl_info, &"--> {title}")
   let response = default_http_client.request(
