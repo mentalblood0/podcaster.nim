@@ -25,7 +25,11 @@ proc upload*(podcaster: var Podcaster, url: Uri): seq[Path] =
   if is_bandcamp and (url in podcaster.cache):
     return
 
-  let parsed = parse(url, 200)
+  let parsed =
+    try:
+      parse(url, 200)
+    except BandcampError:
+      return
 
   if parsed.kind == pPlaylist:
     if parsed.playlist.kind notin [pBandcampArtist, pYoutubeChannel]:
@@ -43,7 +47,11 @@ proc upload*(podcaster: var Podcaster, url: Uri): seq[Path] =
     if is_bandcamp and parsed.playlist.kind != pBandcampArtist:
       podcaster.cache.incl url
   elif parsed.kind == pMedia and parsed.media notin podcaster.cache:
-    let audio = podcaster.downloader.download parsed.media
+    let audio =
+      try:
+        podcaster.downloader.download parsed.media
+      except BandcampError:
+        return
     podcaster.uploader.upload(audio, parsed.media.title, parsed.media.thumbnail_path)
     if is_bandcamp:
       podcaster.cache.incl url

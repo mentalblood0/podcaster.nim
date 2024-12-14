@@ -176,6 +176,8 @@ proc new_temp_file(m: Media, ext: string): string =
   discard new_temp_file &"{p}.part"
   return new_temp_file p
 
+type BandcampError* = object of AssertionDefect
+
 proc execute(command: string, args: seq[string]): string =
   log(lvl_debug, &"{command} {args}")
   let p = start_process(
@@ -187,7 +189,10 @@ proc execute(command: string, args: seq[string]): string =
   try:
     do_assert p.wait_for_exit == 0
   except AssertionDefect:
-    log(lvl_warn, &"{command} {args} failed:\n{p.output_stream.read_all}")
+    result = p.output_stream.read_all
+    log(lvl_warn, &"{command} {args} failed:\n{result}")
+    if "ERROR: [Bandcamp]" in result:
+      raise new_exception(BandcampError, result)
     raise
   result = p.output_stream.read_all
   p.close
