@@ -73,7 +73,7 @@ proc remove_temp_files*() =
     p.remove_file
 
 add_exit_proc remove_temp_files
-set_control_c_hook () {.noconv.} => quit()
+set_control_c_hook () {.noconv.} => quit(1)
 
 type PlaylistKind* = enum
   pBandcampAlbum
