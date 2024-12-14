@@ -12,7 +12,7 @@ const max_uploaded_audio_size = 1024 * 1024 * 48
 
 var default_http_client* = new_http_client()
 
-type Uploader* = tuple[token: string, chat_id: int]
+type Uploader* = tuple[token: string, chat_id: string]
 
 proc upload*(uploader: Uploader, a: Audio, title: string, thumbnail_path: string) =
   if a.path.get_file_size >= max_uploaded_audio_size:
@@ -22,7 +22,7 @@ proc upload*(uploader: Uploader, a: Audio, title: string, thumbnail_path: string
 
   var multipart = new_multipart_data()
   multipart.add_files {"audio": a.path, "thumbnail": thumbnail_path}
-  multipart["chat_id"] = $uploader.chat_id
+  multipart["chat_id"] = uploader.chat_id
   multipart["title"] = title
   multipart["duration"] = $a.duration.in_seconds
 

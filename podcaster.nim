@@ -74,7 +74,7 @@ when is_main_module:
 
   for i in 1 .. param_count():
     let splitted_arg = param_str(i).split(':', 1)
-    let chat_id = parse_int splitted_arg[0]
+    let chat_id = splitted_arg[0]
     let url = parse_uri splitted_arg[1]
 
     let cache = new_cache url
