@@ -53,7 +53,7 @@ proc upload*(podcaster: var Podcaster, url: Uri): seq[Path] =
           podcaster.downloader.download_thumbnail parsed.media
           r = podcaster.downloader.download parsed.media
           break
-        except BandcampError:
+        except BandcampError, DurationNotAvailableError:
           return
         except SslUnexpectedEofError, UnableToConnectToProxyError:
           continue

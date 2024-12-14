@@ -65,6 +65,7 @@ type
   BandcampError* = object of AssertionDefect
   BandcampNoVideoFormatsFoundError* = object of BandcampError
   BandcampNoTracksOnPageError* = object of BandcampError
+  DurationNotAvailableError* = object of ValueError
   SslUnexpectedEofError* = object of AssertionDefect
   UnableToConnectToProxyError* = object of AssertionDefect
 
@@ -225,7 +226,13 @@ proc new_media*(url: Uri): Media =
       r
     to_table fields.zip split_lines "yt-dlp".execute args
   result.title = dict["title"]
-  result.duration = init_duration(seconds = int parse_float dict["duration"])
+  result.duration =
+    try:
+      init_duration(seconds = int parse_float dict["duration"])
+    except:
+      raise new_exception(
+        DurationNotAvailableError, &"Duration value not available for media at {url}"
+      )
   result.uploaded = block:
     try:
       utc from_unix parse_int dict["timestamp"]
