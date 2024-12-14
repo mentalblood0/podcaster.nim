@@ -18,7 +18,6 @@ type Podcaster* = tuple[cache: Cache, downloader: Downloader, uploader: Uploader
 proc upload*(podcaster: var Podcaster, url: Uri) =
   let is_bandcamp = is_bandcamp_url url
   if is_bandcamp and (url in podcaster.cache):
-    echo &"{url} is in cache"
     return
 
   log(lvl_info, &"<-- {url}")
