@@ -67,7 +67,7 @@ proc new_temp_file(u: Url, postfix: string): string =
     "=", ""
   ) & "_" & postfix
 
-proc remove_temp_files() =
+proc remove_temp_files*() =
   for p in temp_files:
     p.remove_file
 

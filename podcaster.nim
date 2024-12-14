@@ -77,4 +77,8 @@ when is_main_module:
       uploader: (token: get_env "podcaster_token", chat_id: chat_id),
     )
 
-    podcaster.upload url
+    try:
+      podcaster.upload url
+    except:
+      remove_temp_files()
+      raise
