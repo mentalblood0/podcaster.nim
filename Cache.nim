@@ -1,8 +1,4 @@
-import xxhash
-import nint128
-
 import std/files
-import std/base64
 import std/uri
 import std/dirs
 import std/appdirs
@@ -24,9 +20,6 @@ proc new_cache*(uri: Uri): Cache =
   if file_exists result.path:
     result.hashes = to_hash_set split_lines read_file result.path.string
 
-func hash(u: Uri): string =
-  return ($u).XXH3_128bits.to_bytes_b_e.encode(safe = true).replace("=", "")
-
 proc incl(c: var Cache, h: string) =
   if h notin c.hashes:
     create_dir c.path.split_path.head
@@ -42,13 +35,13 @@ proc incl*(c: var Cache, p: Playlist) =
   c.incl p.hash
 
 proc incl*(c: var Cache, u: Uri) =
-  c.incl u.hash
+  c.incl u.safe_hash
 
 proc `notin`*(m: Media, c: Cache): bool =
   m.hash notin c.hashes
 
 proc `in`*(u: Uri, c: Cache): bool =
-  u.hash in c.hashes
+  u.safe_hash in c.hashes
 
 proc `notin`*(u: Uri, c: Cache): bool =
-  u.hash notin c.hashes
+  u.safe_hash notin c.hashes

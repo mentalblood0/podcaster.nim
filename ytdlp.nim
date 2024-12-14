@@ -62,10 +62,11 @@ proc new_temp_file(name: string): string =
   temp_files.incl path
   return path
 
-proc new_temp_file(u: Url, postfix: string): string =
-  new_temp_file encode($u.string.XXH3_128bits.to_bytes_b_e, safe = true).replace(
-    "=", ""
-  ) & "_" & postfix
+func safe_hash*(u: Uri): string =
+  ($u).XXH3_128bits.to_bytes_b_e.encode(safe = true).replace("=", "")
+
+proc new_temp_file(u: Uri, postfix: string): string =
+  new_temp_file u.safe_hash & "_" & postfix
 
 proc remove_temp_files*() =
   for p in temp_files:
@@ -211,7 +212,7 @@ proc new_media*(url: Uri, scale_width: int): Media =
     except ValueError:
       dict["upload_date"].parse "yyyymmdd", utc()
   result.thumbnail_path = block:
-    let thumbnail_url = dict["thumbnail"].Url
+    let thumbnail_url = parse_uri dict["thumbnail"]
     let scaled_path = thumbnail_url.new_temp_file "scaled.png"
     if not scaled_path.file_exists:
       let original_path = thumbnail_url.new_temp_file "original.jpg"
