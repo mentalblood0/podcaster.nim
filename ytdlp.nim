@@ -75,6 +75,41 @@ proc remove_temp_files*() =
 add_exit_proc remove_temp_files
 set_control_c_hook () {.noconv.} => quit(1)
 
+type
+  BandcampError* = object of AssertionDefect
+  BandcampNoVideoFormatsFoundError* = object of BandcampError
+  BandcampNoTracksOnPageError* = object of BandcampError
+  SslUnexpectedEofError* = object of AssertionDefect
+
+proc check_substring_exceptions(command_output: string) =
+  if "ERROR: [Bandcamp] 1235306164: No video formats found!;" in command_output:
+    raise new_exception(BandcampNoVideoFormatsFoundError, command_output)
+  if "ERROR: [Bandcamp:album] vhs-tapes: The page doesn't contain any tracks;" in
+      command_output:
+    raise new_exception(BandcampNoTracksOnPageError, command_output)
+  if "SSL: UNEXPECTED_EOF_WHILE_READING" in command_output:
+    raise new_exception(SslUnexpectedEofError, command_output)
+  raise
+
+proc execute(command: string, args: seq[string]): string =
+  log(lvl_debug, &"{command} {args}")
+  let p = start_process(
+    command,
+    args = args,
+    options = {po_use_path, po_std_err_to_std_out},
+    env = new_string_table({"http_proxy": ytdlp_proxy, "https_proxy": ytdlp_proxy}),
+  )
+  try:
+    do_assert p.wait_for_exit == 0
+  except AssertionDefect:
+    result = p.output_stream.read_all
+    let command_string = command & " " & args.join(" ")
+    log(lvl_warn, &"command '{command_string}' failed:\n{result}")
+    check_substring_exceptions(result)
+    raise
+  result = p.output_stream.read_all
+  p.close
+
 type PlaylistKind* = enum
   pBandcampAlbum
   pBandcampArtist
@@ -109,9 +144,7 @@ proc new_playlist*(url: Uri): Playlist =
       r.add k
     r.add $url
     r
-  let d = to_table fields.zip exec_process(
-    "yt-dlp", args = args, options = {po_use_path}
-  ).split_lines
+  let d = to_table fields.zip split_lines "yt-dlp".execute args
   result.url = url
   result.title = d["playlist_title"]
   result.uploader = d["playlist_uploader"]
@@ -176,27 +209,6 @@ proc new_temp_file(m: Media, ext: string): string =
   discard new_temp_file &"{p}.part"
   return new_temp_file p
 
-type BandcampError* = object of AssertionDefect
-
-proc execute(command: string, args: seq[string]): string =
-  log(lvl_debug, &"{command} {args}")
-  let p = start_process(
-    command,
-    args = args,
-    options = {po_use_path, po_std_err_to_std_out},
-    env = new_string_table({"http_proxy": ytdlp_proxy, "https_proxy": ytdlp_proxy}),
-  )
-  try:
-    do_assert p.wait_for_exit == 0
-  except AssertionDefect:
-    result = p.output_stream.read_all
-    log(lvl_warn, &"{command} {args} failed:\n{result}")
-    if "ERROR: [Bandcamp]" in result:
-      raise new_exception(BandcampError, result)
-    raise
-  result = p.output_stream.read_all
-  p.close
-
 proc new_media*(url: Uri, scale_width: int): Media =
   result.url = url
   let dict = block:
@@ -220,14 +232,16 @@ proc new_media*(url: Uri, scale_width: int): Media =
     let thumbnail_url = parse_uri dict["thumbnail"]
     let scaled_path = thumbnail_url.new_temp_file "scaled.png"
     if not scaled_path.file_exists:
-      let original_path = thumbnail_url.new_temp_file "original.jpg"
+      let possible_original_paths =
+        ["jpg", "webp"].map (e: string) => thumbnail_url.new_temp_file "original." & e
       discard "yt-dlp".execute @[
         $url,
         "--write-thumbnail",
         "--skip-download",
         "-o",
-        $original_path.change_file_ext "",
+        $possible_original_paths[0].change_file_ext "",
       ]
+      let original_path = possible_original_paths.filter(file_exists)[0]
       let converted_path = thumbnail_url.new_temp_file "converted.png"
       discard "ffmpeg".execute @["-i", original_path, converted_path]
       discard "ffmpeg".execute @[
@@ -319,7 +333,11 @@ iterator split_into(a: Audio, parts: int): Audio =
         options = {po_use_path, po_std_err_to_std_out},
       )
   for i, p in processes:
-    do_assert p.wait_for_exit == 0
+    try:
+      do_assert p.wait_for_exit == 0
+    except AssertionDefect:
+      log(lvl_warn, p.output_stream.read_all)
+      raise
     p.close
     yield (
       path: a.new_temp_file(i + 1),

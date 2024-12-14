@@ -48,11 +48,17 @@ proc upload*(podcaster: var Podcaster, url: Uri): seq[Path] =
     if is_bandcamp and parsed.playlist.kind != pBandcampArtist:
       podcaster.cache.incl url
   elif parsed.kind == pMedia and parsed.media notin podcaster.cache:
-    let audio =
-      try:
-        podcaster.downloader.download parsed.media
-      except BandcampError:
-        return
+    let audio = block:
+      var r: Audio
+      while true:
+        try:
+          r = podcaster.downloader.download parsed.media
+          break
+        except BandcampError:
+          return
+        except SslUnexpectedEofError:
+          continue
+      r
     podcaster.uploader.upload(audio, parsed.media.title, parsed.media.thumbnail_path)
     if is_bandcamp:
       podcaster.cache.incl url
