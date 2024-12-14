@@ -24,11 +24,11 @@ let bandcamp_albums_urls_regexes* =
   ]
 let bandcamp_url_regex* = re"https?:\/\/(?:\w+\.)?bandcamp\.com.*$"
 let bandcamp_artist_url_regex* =
-  re"https?:\/\/(?:\w+\.)?bandcamp\.com(?:\/|(?:\/music\/?))?$"
+  re"https?:\/\/(?:(?:\w|-)+\.)?bandcamp\.com(?:\/|(?:\/music\/?))?$"
 let bandcamp_album_url_regex* =
-  re"https?:\/\/(?:\w+\.)?bandcamp\.com\/album\/(?:(?:(?:\w|-)+)|(?:-*\d+))\/?$"
+  re"https?:\/\/(?:(?:\w|-)+\.)?bandcamp\.com\/album\/(?:(?:(?:\w|-)+)|(?:-*\d+))\/?$"
 let bandcamp_track_url_regex* =
-  re"https?:\/\/(?:\w+\.)?bandcamp\.com\/track\/[^\/]+\/?$"
+  re"https?:\/\/(?:(?:\w|-)+\.)?bandcamp\.com\/track\/[^\/]+\/?$"
 let youtube_channel_url_regex* =
   re"https?:\/\/(?:www\.)?youtube\.com\/@?(\w+)(:?(?:\/?)|(?:\/videos\/?)|(?:\/playlists\/?)|(?:\/streams\/?))$"
 let youtube_playlist_url_regex* =
@@ -199,6 +199,7 @@ type Media* =
     uploaded: DateTime,
     uploader: string,
     duration: Duration,
+    thumbnail_url: Uri,
     thumbnail_path: string,
   ]
 
@@ -211,7 +212,7 @@ proc new_temp_file(m: Media, ext: string): string =
   discard new_temp_file &"{p}.part"
   return new_temp_file p
 
-proc new_media*(url: Uri, scale_width: int): Media =
+proc new_media*(url: Uri): Media =
   result.url = url
   let dict = block:
     const fields = ["title", "upload_date", "timestamp", "duration", "thumbnail"]
@@ -230,28 +231,28 @@ proc new_media*(url: Uri, scale_width: int): Media =
       utc from_unix parse_int dict["timestamp"]
     except ValueError:
       dict["upload_date"].parse "yyyymmdd", utc()
-  result.thumbnail_path = block:
-    let thumbnail_url = parse_uri dict["thumbnail"]
-    let scaled_path = thumbnail_url.new_temp_file "scaled.png"
-    if not scaled_path.file_exists:
-      let possible_original_paths =
-        ["jpg", "webp"].map (e: string) => thumbnail_url.new_temp_file "original." & e
-      discard "yt-dlp".execute @[
-        $url,
-        "--write-thumbnail",
-        "--skip-download",
-        "-o",
-        $possible_original_paths[0].change_file_ext "",
-      ]
-      let original_path = possible_original_paths.filter(file_exists)[0]
-      let converted_path = thumbnail_url.new_temp_file "converted.png"
-      discard "ffmpeg".execute @["-i", original_path, converted_path]
-      discard "ffmpeg".execute @[
-        "-i", converted_path, "-vf", &"scale={scale_width}:-1", scaled_path
-      ]
-      original_path.remove_file
-      converted_path.remove_file
-    scaled_path
+  result.thumbnail_url = parse_uri dict["thumbnail"]
+  result.thumbnail_path = result.thumbnail_url.new_temp_file "scaled.png"
+
+proc download_thumbnail*(media: Media, scale_width: int) =
+  if not media.thumbnail_path.file_exists:
+    let possible_original_paths = ["jpg", "webp"].map (e: string) =>
+      media.thumbnail_url.new_temp_file "original." & e
+    discard "yt-dlp".execute @[
+      $media.url,
+      "--write-thumbnail",
+      "--skip-download",
+      "-o",
+      $possible_original_paths[0].change_file_ext "",
+    ]
+    let original_path = possible_original_paths.filter(file_exists)[0]
+    let converted_path = media.thumbnail_url.new_temp_file "converted.png"
+    discard "ffmpeg".execute @["-i", original_path, converted_path]
+    discard "ffmpeg".execute @[
+      "-i", converted_path, "-vf", &"scale={scale_width}:-1", media.thumbnail_path
+    ]
+    original_path.remove_file
+    converted_path.remove_file
 
 type
   ParsedKind* = enum
@@ -267,16 +268,16 @@ type
     of pMedia:
       media*: Media
 
-proc parse*(url: Uri, thumbnail_scale_width: int): Parsed =
+proc parse*(url: Uri): Parsed =
   if (($url).match bandcamp_track_url_regex).is_some or
       (($url).match youtube_video_url_regex).is_some:
-    return Parsed(kind: pMedia, media: new_media(url, thumbnail_scale_width))
+    return Parsed(kind: pMedia, media: new_media(url))
   return Parsed(kind: pPlaylist, playlist: new_playlist url)
 
 type Audio* = tuple[path: string, duration: Duration]
 
-proc new_temp_file(a: Audio, prefix: string): string =
-  return new_temp_file &"{prefix}_{a.path.extract_file_name}"
+proc new_temp_file(a: Audio, postfix: string): string =
+  return new_temp_file &"{a.path.split_file.name}_{postfix}.mp3"
 
 proc new_temp_file(a: Audio, part: int): string =
   return a.new_temp_file &"part{part}"
@@ -295,7 +296,7 @@ proc audio*(media: Media, kilobits_per_second: Option[int] = none(int)): Audio =
 type ConversionParams* = tuple[bitrate: int, samplerate: int, channels: int]
 
 proc convert*(a: Audio, cp: ConversionParams = (128, 44100, 2)): Audio =
-  let converted_path = a.new_temp_file("converted").add_file_ext "mp3"
+  let converted_path = a.new_temp_file "converted"
   discard "ffmpeg".execute @[
     "-i",
     a.path,

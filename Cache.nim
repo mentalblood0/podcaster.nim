@@ -42,6 +42,9 @@ proc incl*(c: var Cache, p: Playlist) =
 proc incl*(c: var Cache, u: Uri) =
   c.incl u.safe_hash
 
+proc `in`*(m: Media, c: Cache): bool =
+  m.hash in c.hashes
+
 proc `notin`*(m: Media, c: Cache): bool =
   m.hash notin c.hashes
 

@@ -23,7 +23,7 @@ proc upload*(podcaster: var Podcaster, url: Uri): seq[Path] =
 
   let parsed =
     try:
-      parse(url, 200)
+      parse(url)
     except BandcampError:
       return
 
@@ -37,11 +37,16 @@ proc upload*(podcaster: var Podcaster, url: Uri): seq[Path] =
           r &= podcaster.upload url
           podcaster.cache.incl url
         else:
-          r &= podcaster.upload url
+          remove_thumbnails podcaster.upload url
       r
     if is_bandcamp and parsed.playlist.kind != pBandcampArtist:
       podcaster.cache.incl url
-  elif parsed.kind == pMedia and parsed.media notin podcaster.cache:
+  elif parsed.kind == pMedia:
+    if parsed.media in podcaster.cache:
+      if not podcaster.reverse_order and not is_bandcamp:
+        return
+      return
+    podcaster.downloader.download_thumbnail parsed.media
     let audio = block:
       var r: Audio
       while true:
@@ -59,6 +64,16 @@ proc upload*(podcaster: var Podcaster, url: Uri): seq[Path] =
     else:
       podcaster.cache.incl parsed.media
     result.add parsed.media.thumbnail_path.Path
+
+proc get_reverse_order(cache: Cache): bool =
+  let reverse_order_arg = get_env "podcaster_from_first"
+  if reverse_order_arg.len > 0:
+    case reverse_order_arg
+    of "true":
+      return true
+    of "false":
+      return false
+  return cache.hashes.len == 0
 
 when is_main_module:
   ytdlp_proxy = get_env "podcaster_http_proxy"
@@ -95,9 +110,10 @@ when is_main_module:
             some (bitrate: splitted[0], samplerate: splitted[1], channels: splitted[2])
           else:
             none(ConversionParams),
+        thumbnail_scale_width: 200,
       ),
       uploader: (token: get_env "podcaster_token", chat_id: chat_id),
-      reverse_order: cache.hashes.len == 0,
+      reverse_order: get_reverse_order(cache),
     )
 
     try:
