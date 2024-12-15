@@ -70,7 +70,7 @@ type
   UnableToConnectToProxyError* = object of AssertionDefect
 
 proc check_substring_exceptions(command_output: string) =
-  if "ERROR: [Bandcamp] 1235306164: No video formats found!;" in command_output:
+  if is_some command_output.match re"ERROR: \[Bandcamp\] \d+: No video formats found!;":
     raise new_exception(BandcampNoVideoFormatsFoundError, command_output)
   if "ERROR: [Bandcamp:album] vhs-tapes: The page doesn't contain any tracks;" in
       command_output:
@@ -111,7 +111,11 @@ proc wait_for_exit(p: CommandProcess): string =
   p.process.close
 
 proc execute(command: string, args: seq[string]): string =
-  wait_for_exit command.new_command_process args
+  while true:
+    try:
+      return wait_for_exit command.new_command_process args
+    except SslUnexpectedEofError, UnableToConnectToProxyError:
+      continue
 
 type PlaylistKind* = enum
   pBandcampAlbum
@@ -185,19 +189,14 @@ iterator items*(playlist: Playlist, from_first: bool = false): Uri =
           &"{i - 1}:{i - 1}:{step}"
         else:
           &"{i}:{i + 1}:{step}"
-      try:
-        yield parse_uri (
-          "yt-dlp".execute @[
-            "--flat-playlist",
-            "--print",
-            "url",
-            "--playlist-items",
-            query,
-            $playlist.url,
-          ]
-        ).split_lines[0]
-      except AssertionDefect:
+      let output = (
+        "yt-dlp".execute @[
+          "--flat-playlist", "--print", "url", "--playlist-items", query, $playlist.url
+        ]
+      ).split_lines[0]
+      if output == "":
         break
+      yield parse_uri output
       i += step
   elif playlist.kind == pBandcampArtist:
     let page = download_page playlist.url

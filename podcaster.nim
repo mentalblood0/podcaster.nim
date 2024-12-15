@@ -28,8 +28,6 @@ proc upload_bandcamp(podcaster: var Podcaster, url: Uri): seq[Path] =
     except BandcampError:
       podcaster.cache.incl url
       return
-    except SslUnexpectedEofError, UnableToConnectToProxyError:
-      continue
 
   if parsed.kind == pPlaylist:
     if parsed.playlist.kind == pBandcampAlbum:
@@ -41,23 +39,21 @@ proc upload_bandcamp(podcaster: var Podcaster, url: Uri): seq[Path] =
     if parsed.playlist.kind == pBandcampAlbum:
       podcaster.cache.incl url
   elif parsed.kind == pMedia:
-    var a: Audio
-    while true:
+    let a = block:
       try:
         podcaster.downloader.download_thumbnail parsed.media
         result.add parsed.media.thumbnail_path.Path
-        a = podcaster.downloader.download parsed.media
-        break
+        podcaster.downloader.download parsed.media
       except BandcampError:
+        podcaster.cache.incl url
         return
-      except SslUnexpectedEofError, UnableToConnectToProxyError:
-        continue
     podcaster.uploader.upload(
       a, parsed.media.performer, parsed.media.title, parsed.media.thumbnail_path
     )
     podcaster.cache.incl url
 
 proc upload_nonbandcamp(podcaster: var Podcaster, url: Uri): bool =
+  result = false
   var parsed: Parsed
   while true:
     try:
@@ -75,17 +71,13 @@ proc upload_nonbandcamp(podcaster: var Podcaster, url: Uri): bool =
   elif parsed.kind == pMedia:
     if parsed.media in podcaster.cache:
       return not podcaster.from_first
-    var a: Audio
-    while true:
+    let a = block:
       try:
         podcaster.downloader.download_thumbnail parsed.media
-        a = podcaster.downloader.download parsed.media
-        break
+        podcaster.downloader.download parsed.media
       except BandcampError, DurationNotAvailableError:
         podcaster.cache.incl parsed.media
         return
-      except SslUnexpectedEofError, UnableToConnectToProxyError:
-        continue
     podcaster.uploader.upload(
       a, parsed.media.performer, parsed.media.title, parsed.media.thumbnail_path
     )
