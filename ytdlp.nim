@@ -130,13 +130,10 @@ type PlaylistKind* = enum
   pYoutubePlaylist
   pYoutubeChannel
 
-type Playlist* = tuple[url: Uri, title, uploader: string, kind: PlaylistKind]
-
-func hash*(p: Playlist): string =
-  let id = %*{"title": p.title, "uploader": p.uploader}
-  return ($id).XXH3_128bits.to_bytes_b_e.encode(safe = true).replace("=", "")
+type Playlist* = tuple[url: Uri, kind: PlaylistKind]
 
 proc new_playlist*(url: Uri): Playlist =
+  result.url = url
   if is_some ($url).match bandcamp_album_url_regex:
     result.kind = pBandcampAlbum
   elif is_some ($url).match bandcamp_artist_url_regex:
@@ -151,19 +148,6 @@ proc new_playlist*(url: Uri): Playlist =
     raise new_exception(
       ValueError, "No regular expression match supposedly playlist URL \"" & $url & "\""
     )
-
-  const fields = ["playlist_title", "playlist_uploader"]
-  let args = block:
-    var r = @["--skip-download", "--playlist-items", "1"]
-    for k in fields:
-      r.add "--print"
-      r.add k
-    r.add $url
-    r
-  let d = to_table fields.zip split_lines "yt-dlp".execute args
-  result.url = url
-  result.title = d["playlist_title"]
-  result.uploader = d["playlist_uploader"]
 
 proc download_page(url: Uri): string =
   let output_lines = exec_process(

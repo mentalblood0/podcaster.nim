@@ -31,7 +31,7 @@ proc upload_bandcamp(podcaster: var Podcaster, url: Uri): seq[Path] =
 
   if parsed.kind == pPlaylist:
     if parsed.playlist.kind == pBandcampAlbum:
-      log(lvl_info, &"<-- {parsed.playlist.uploader} - {parsed.playlist.title}")
+      log(lvl_info, &"<-- {parsed.playlist.url}")
     var thumbnails_to_remove: seq[Path]
     for url in parsed.playlist.items podcaster.from_first:
       thumbnails_to_remove &= podcaster.upload_bandcamp url

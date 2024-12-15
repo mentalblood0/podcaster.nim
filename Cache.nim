@@ -43,9 +43,6 @@ proc incl(c: var Cache, h: string) =
 proc incl*(c: var Cache, m: Media) =
   c.incl m.hash
 
-proc incl*(c: var Cache, p: Playlist) =
-  c.incl p.hash
-
 proc incl*(c: var Cache, u: Uri) =
   c.incl u.safe_hash
 
