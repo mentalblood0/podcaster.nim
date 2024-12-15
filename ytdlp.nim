@@ -73,6 +73,7 @@ type
   SslUnexpectedEofError* = object of AssertionDefect
   UnableToConnectToProxyError* = object of AssertionDefect
   ReadTimedOutError* = object of AssertionDefect
+  UnableToFetchPoTokenError* = object of AssertionDefect
 
 proc check_substring_exceptions(command_output: string) =
   if is_some command_output.match re"ERROR: \[Bandcamp\] \d+: No video formats found!;":
@@ -86,6 +87,8 @@ proc check_substring_exceptions(command_output: string) =
     raise new_exception(UnableToConnectToProxyError, command_output)
   if "Read timed out." in command_output:
     raise new_exception(ReadTimedOutError, command_output)
+  if "Unable to fetch PO Token for mweb client" in command_output:
+    raise new_exception(UnableToFetchPoTokenError, command_output)
   raise
 
 type CommandProcess = tuple[command: string, args: seq[string], process: Process]
@@ -121,7 +124,8 @@ proc execute(command: string, args: seq[string]): string =
   while true:
     try:
       return wait_for_exit command.new_command_process args
-    except SslUnexpectedEofError, UnableToConnectToProxyError, ReadTimedOutError:
+    except SslUnexpectedEofError, UnableToConnectToProxyError, ReadTimedOutError,
+        UnableToFetchPoTokenError:
       continue
 
 type PlaylistKind* = enum
