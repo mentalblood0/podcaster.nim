@@ -330,7 +330,7 @@ proc audio*(media: Media, kilobits_per_second: Option[int] = none(int)): Audio =
       "mp3"
   let temp_path = media.new_temp_file ""
   lvl_info.log if is_some media.performer:
-    &"<-- {media.performer} - {media.title}"
+    &"<-- {media.performer.get} - {media.title}"
   else:
     &"<-- {media.title}"
   discard "yt-dlp".execute @["-f", format, "-o", temp_path, $media.url]
