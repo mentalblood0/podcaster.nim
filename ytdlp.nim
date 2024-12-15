@@ -179,11 +179,12 @@ iterator items*(playlist: Playlist, from_first: bool = false): Uri =
   elif playlist.kind in [pYoutubeChannel, pYoutubePlaylist]:
     var i = 0
     while true:
+      let step = if from_first: -1 else: 1
       let query =
         if from_first:
-          &"{i - 1}:{i - 1}:-1"
+          &"{i - 1}:{i - 1}:{step}"
         else:
-          &"{i}:{i + 1}:1"
+          &"{i}:{i + 1}:{step}"
       try:
         yield parse_uri (
           "yt-dlp".execute @[
@@ -197,7 +198,7 @@ iterator items*(playlist: Playlist, from_first: bool = false): Uri =
         ).split_lines[0]
       except AssertionDefect:
         break
-      i += 1
+      i += step
   elif playlist.kind == pBandcampArtist:
     let page = download_page playlist.url
     var urls = block:
