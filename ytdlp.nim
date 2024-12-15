@@ -30,7 +30,9 @@ let bandcamp_album_url_regex* =
 let bandcamp_track_url_regex* =
   re"https?:\/\/(?:(?:\w|-)+\.)?bandcamp\.com\/track\/[^\/]+\/?$"
 let youtube_channel_url_regex* =
-  re"https?:\/\/(?:www\.)?youtube\.com\/@?(\w+)(:?(?:\/?)|(?:\/videos\/?)|(?:\/playlists\/?)|(?:\/streams\/?))$"
+  re"https?:\/\/(?:www\.)?youtube\.com\/@?((?:\w|\.)+)(:?(?:\/?)|(?:\/videos\/?)|(?:\/playlists\/?)|(?:\/streams\/?))$"
+let youtube_topic_url_regex* =
+  re"https?:\/\/(?:www\.)?youtube\.com\/channel\/\w+(:?\/?|(?:\/videos\/?))?"
 let youtube_playlist_url_regex* =
   re"https?:\/\/(?:www\.)?youtube\.com\/playlist\?list=\w+\/?$"
 let youtube_video_url_regex* = re"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=.*$"
@@ -135,6 +137,8 @@ proc new_playlist*(url: Uri): Playlist =
   elif is_some ($url).match bandcamp_artist_url_regex:
     result.kind = pBandcampArtist
   elif is_some ($url).match youtube_channel_url_regex:
+    result.kind = pYoutubeChannel
+  elif is_some ($url).match youtube_topic_url_regex:
     result.kind = pYoutubeChannel
   elif is_some ($url).match youtube_playlist_url_regex:
     result.kind = pYoutubePlaylist
