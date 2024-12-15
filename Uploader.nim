@@ -31,7 +31,7 @@ proc upload*(
 
   log(lvl_debug, &"multipart is:\n{multipart}")
 
-  log(lvl_info, &"--> {title}")
+  log(lvl_info, &"--> {performer} - {title}")
   while true:
     let response = default_http_client.request(
       "https://api.telegram.org/bot" & uploader.token & "/sendAudio",
