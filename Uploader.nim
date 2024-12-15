@@ -1,4 +1,5 @@
-import std/[uri, os, times, enumerate, httpclient, logging, strformat, options]
+import
+  std/[uri, os, times, enumerate, httpclient, logging, strformat, options, strutils]
 
 import ytdlp
 
@@ -31,11 +32,16 @@ proc upload*(
   log(lvl_debug, &"multipart is:\n{multipart}")
 
   log(lvl_info, &"--> {title}")
-  let response = default_http_client.request(
-    "https://api.telegram.org/bot" & uploader.token & "/sendAudio",
-    http_method = HttpPost,
-    multipart = multipart,
-  )
-  log(lvl_debug, &"response is {response.status} {response.body}")
+  while true:
+    let response = default_http_client.request(
+      "https://api.telegram.org/bot" & uploader.token & "/sendAudio",
+      http_method = HttpPost,
+      multipart = multipart,
+    )
+    log(lvl_debug, &"response is {response.status} {response.body}")
+    if response.status.starts_with "429":
+      sleep(1000)
+      continue
+    do_assert response.status == "200 OK"
+    break
   a.path.remove_file
-  do_assert response.status == "200 OK"
