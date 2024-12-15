@@ -16,9 +16,14 @@ proc cache_file_name(url: Uri): string =
     let m = ($url).match bandcamp_url_regex
     if is_some m:
       return m.get.captures[0]
-  block youtube:
+  block youtube_channel:
     let m = ($url).match youtube_channel_url_regex
-    return m.get.captures[0]
+    if is_some m:
+      return m.get.captures[0]
+  block youtube_topic:
+    let m = ($url).match youtube_topic_url_regex
+    if is_some m:
+      return m.get.captures[0]
 
 proc new_cache*(url: Uri): Cache =
   result.path =

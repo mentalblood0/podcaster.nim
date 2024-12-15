@@ -30,12 +30,14 @@ let bandcamp_album_url_regex* =
 let bandcamp_track_url_regex* =
   re"https?:\/\/(?:(?:\w|-)+\.)?bandcamp\.com\/track\/[^\/]+\/?$"
 let youtube_channel_url_regex* =
-  re"https?:\/\/(?:www\.)?youtube\.com\/@?((?:\w|\.)+)(:?(?:\/?)|(?:\/videos\/?)|(?:\/playlists\/?)|(?:\/streams\/?))$"
+  re"https?:\/\/(?:www\.)?youtube\.com\/@?((?:\w|\.)+)(:?(?:\/?)|(?:\/shorts\/?)|(?:\/videos\/?)|(?:\/playlists\/?)|(?:\/streams\/?))$"
 let youtube_topic_url_regex* =
   re"https?:\/\/(?:www\.)?youtube\.com\/channel\/\w+(:?\/?|(?:\/videos\/?))?"
 let youtube_playlist_url_regex* =
-  re"https?:\/\/(?:www\.)?youtube\.com\/playlist\?list=\w+\/?$"
+  re"https?:\/\/(?:www\.)?youtube\.com\/playlist\?list=(?:\w|-)+\/?$"
+# https://www.youtube.com/playlist?list=OLAK5uy_lmrAEUvtxIzatZWTVYhG-LIOmj3lsHugQ
 let youtube_video_url_regex* = re"https?:\/\/(?:www\.)?youtube\.com\/watch\?v=.*$"
+let youtube_short_url_regex* = re"https?:\/\/(?:www\.)?youtube\.com\/shorts\/\w+$"
 
 proc is_bandcamp_url*(url: Uri): bool =
   is_some ($url).match bandcamp_url_regex
@@ -70,6 +72,7 @@ type
   DurationNotAvailableError* = object of ValueError
   SslUnexpectedEofError* = object of AssertionDefect
   UnableToConnectToProxyError* = object of AssertionDefect
+  ReadTimedOutError* = object of AssertionDefect
 
 proc check_substring_exceptions(command_output: string) =
   if is_some command_output.match re"ERROR: \[Bandcamp\] \d+: No video formats found!;":
@@ -81,6 +84,8 @@ proc check_substring_exceptions(command_output: string) =
     raise new_exception(SslUnexpectedEofError, command_output)
   if "Unable to connect to proxy" in command_output:
     raise new_exception(UnableToConnectToProxyError, command_output)
+  if "Read timed out." in command_output:
+    raise new_exception(ReadTimedOutError, command_output)
   raise
 
 type CommandProcess = tuple[command: string, args: seq[string], process: Process]
@@ -116,7 +121,7 @@ proc execute(command: string, args: seq[string]): string =
   while true:
     try:
       return wait_for_exit command.new_command_process args
-    except SslUnexpectedEofError, UnableToConnectToProxyError:
+    except SslUnexpectedEofError, UnableToConnectToProxyError, ReadTimedOutError:
       continue
 
 type PlaylistKind* = enum
@@ -316,7 +321,8 @@ type
 proc parse*(url: Uri): Parsed =
   log(lvl_debug, &"parse url '{url}'")
   if (($url).match bandcamp_track_url_regex).is_some or
-      (($url).match youtube_video_url_regex).is_some:
+      (($url).match youtube_video_url_regex).is_some or
+      (($url).match youtube_short_url_regex).is_some:
     return Parsed(kind: pMedia, media: new_media(url))
   return Parsed(kind: pPlaylist, playlist: new_playlist url)
 
