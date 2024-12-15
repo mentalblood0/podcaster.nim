@@ -223,6 +223,15 @@ type Media* =
     thumbnail_path: string,
   ]
 
+func log_string*(performer: Option[string], title: string): string =
+  if is_some performer:
+    return &"{performer.get} - {title}"
+  else:
+    return title
+
+func log_string*(m: Media): string =
+  log_string(m.performer, m.title)
+
 func hash*(m: Media): string =
   let id = %*{"title": m.title, "uploaded": to_unix to_time m.uploaded}
   return ($id).XXH3_128bits.to_bytes_b_e.encode(safe = true).replace("=", "")
@@ -329,10 +338,7 @@ proc audio*(media: Media, kilobits_per_second: Option[int] = none(int)): Audio =
     else:
       "mp3"
   let temp_path = media.new_temp_file ""
-  lvl_info.log if is_some media.performer:
-    &"<-- {media.performer.get} - {media.title}"
-  else:
-    &"<-- {media.title}"
+  lvl_info.log &"<-- {media.log_string}"
   discard "yt-dlp".execute @["-f", format, "-o", temp_path, $media.url]
   return (path: temp_path, duration: media.duration)
 
