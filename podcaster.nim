@@ -82,13 +82,14 @@ proc upload_nonbandcamp(podcaster: var Podcaster, url: Uri): bool =
         a = podcaster.downloader.download parsed.media
         break
       except BandcampError, DurationNotAvailableError:
+        podcaster.cache.incl parsed.media
         return
       except SslUnexpectedEofError, UnableToConnectToProxyError:
         continue
     podcaster.uploader.upload(
       a, parsed.media.performer, parsed.media.title, parsed.media.thumbnail_path
     )
-    podcaster.cache.incl url
+    podcaster.cache.incl parsed.media
     parsed.media.thumbnail_path.Path.remove_file
 
 proc upload(podcaster: var Podcaster, url: Uri) =
