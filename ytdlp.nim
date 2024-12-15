@@ -162,13 +162,13 @@ proc download_page(url: Uri): string =
     if is_some l.match page_regex:
       return decode l
 
-iterator items*(playlist: Playlist, reverse_order: bool = false): Uri =
+iterator items*(playlist: Playlist, from_first: bool = false): Uri =
   if playlist.kind in [pYoutubeChannel, pYoutubeChannel, pBandcampAlbum]:
     let output_lines = exec_process(
       "yt-dlp",
       args = block:
         var a = @["--flat-playlist", "--print", "url", $playlist.url]
-        if reverse_order:
+        if from_first:
           a &= @["--playlist-items", "::-1"]
         a,
       options = {po_use_path},
