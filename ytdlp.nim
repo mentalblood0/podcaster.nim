@@ -181,7 +181,7 @@ iterator items*(playlist: Playlist, from_first: bool = false): Uri =
     while true:
       let query =
         if from_first:
-          &"{i - 1}{i - 1}:-1"
+          &"{i - 1}:{i - 1}:-1"
         else:
           &"{i}:{i + 1}:1"
       try:
