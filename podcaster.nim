@@ -16,72 +16,86 @@ proc remove_thumbnails(paths: seq[Path]) =
   for p in paths:
     p.remove_file
 
-type UploadResult = tuple[thumbnails_to_remove: seq[Path], cascade_stop: bool]
-
-template process_upload_result(r: UploadResult): untyped =
-  if r.cascade_stop:
-    remove_thumbnails r.thumbnails_to_remove
-    return
-  if parsed.playlist.kind == pBandcampAlbum:
-    result.thumbnails_to_remove &= r.thumbnails_to_remove
-  else:
-    remove_thumbnails r.thumbnails_to_remove
-
-proc upload*(podcaster: var Podcaster, url: Uri): UploadResult =
-  let is_bandcamp = is_bandcamp_url url
-  if is_bandcamp and (url in podcaster.cache):
+proc upload_bandcamp(podcaster: var Podcaster, url: Uri): seq[Path] =
+  if url in podcaster.cache:
     return
 
-  let parsed = block:
-    var r: Parsed
+  var parsed: Parsed
+  while true:
+    try:
+      parsed = parse url
+      break
+    except BandcampError:
+      podcaster.cache.incl url
+      return
+    except SslUnexpectedEofError, UnableToConnectToProxyError:
+      continue
+
+  if parsed.kind == pPlaylist:
+    if parsed.playlist.kind == pBandcampAlbum:
+      log(lvl_info, &"<-- {parsed.playlist.uploader} - {parsed.playlist.title}")
+    var thumbnails_to_remove: seq[Path]
+    for url in parsed.playlist.items podcaster.from_first:
+      thumbnails_to_remove &= podcaster.upload_bandcamp url
+    remove_thumbnails thumbnails_to_remove
+    if parsed.playlist.kind == pBandcampAlbum:
+      podcaster.cache.incl url
+  elif parsed.kind == pMedia:
+    var a: Audio
     while true:
       try:
-        r = parse(url)
+        podcaster.downloader.download_thumbnail parsed.media
+        result.add parsed.media.thumbnail_path.Path
+        a = podcaster.downloader.download parsed.media
         break
-      except BandcampError, DurationNotAvailableError:
-        if is_bandcamp:
-          podcaster.cache.incl url
+      except BandcampError:
         return
       except SslUnexpectedEofError, UnableToConnectToProxyError:
         continue
-    r
+    podcaster.uploader.upload(
+      a, parsed.media.performer, parsed.media.title, parsed.media.thumbnail_path
+    )
+    podcaster.cache.incl url
+
+proc upload_nonbandcamp(podcaster: var Podcaster, url: Uri): bool =
+  var parsed: Parsed
+  while true:
+    try:
+      parsed = parse url
+      break
+    except DurationNotAvailableError:
+      return
+    except SslUnexpectedEofError, UnableToConnectToProxyError:
+      continue
 
   if parsed.kind == pPlaylist:
-    if parsed.playlist.kind notin [pBandcampArtist, pYoutubeChannel]:
-      log(lvl_info, &"<-- {parsed.playlist.uploader} - {parsed.playlist.title}")
     for url in parsed.playlist.items podcaster.from_first:
-      process_upload_result podcaster.upload(url)
-    if is_bandcamp and parsed.playlist.kind != pBandcampArtist:
-      podcaster.cache.incl url
+      if podcaster.upload_nonbandcamp url:
+        return
   elif parsed.kind == pMedia:
     if parsed.media in podcaster.cache:
-      if not podcaster.from_first:
-        result.cascade_stop = true
+      return not podcaster.from_first
+    var a: Audio
+    while true:
+      try:
+        podcaster.downloader.download_thumbnail parsed.media
+        a = podcaster.downloader.download parsed.media
+        break
+      except BandcampError, DurationNotAvailableError:
         return
-      return
-    let audio = block:
-      var r: Option[Audio]
-      while true:
-        try:
-          podcaster.downloader.download_thumbnail parsed.media
-          result.thumbnails_to_remove.add parsed.media.thumbnail_path.Path
-          r = some(podcaster.downloader.download parsed.media)
-          break
-        except BandcampError, DurationNotAvailableError:
-          r = none(Audio)
-          break
-        except SslUnexpectedEofError, UnableToConnectToProxyError:
-          continue
-      r
-    if is_some(audio):
-      podcaster.uploader.upload(
-        audio.get, parsed.media.performer, parsed.media.title,
-        parsed.media.thumbnail_path,
-      )
-    if is_bandcamp:
-      podcaster.cache.incl url
-    else:
-      podcaster.cache.incl parsed.media
+      except SslUnexpectedEofError, UnableToConnectToProxyError:
+        continue
+    podcaster.uploader.upload(
+      a, parsed.media.performer, parsed.media.title, parsed.media.thumbnail_path
+    )
+    podcaster.cache.incl url
+    parsed.media.thumbnail_path.Path.remove_file
+
+proc upload(podcaster: var Podcaster, url: Uri) =
+  if url.is_bandcamp_url:
+    discard podcaster.upload_bandcamp url
+  else:
+    discard podcaster.upload_nonbandcamp url
 
 proc get_from_first(cache: Cache): bool =
   let from_first_arg = get_env "podcaster_from_first"
@@ -135,7 +149,7 @@ when is_main_module:
     )
 
     try:
-      discard podcaster.upload url
+      podcaster.upload url
     except:
       remove_temp_files()
       raise
