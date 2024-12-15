@@ -63,8 +63,6 @@ proc upload_nonbandcamp(podcaster: var Podcaster, url: Uri): bool =
       break
     except DurationNotAvailableError:
       return
-    except SslUnexpectedEofError, UnableToConnectToProxyError:
-      continue
 
   if parsed.kind == pPlaylist:
     for url in parsed.playlist.items podcaster.from_first:
