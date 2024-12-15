@@ -198,7 +198,7 @@ type Media* =
     url: Uri,
     title: string,
     uploaded: DateTime,
-    uploader: string,
+    performer: Option[string],
     duration: Duration,
     thumbnail_url: Uri,
     thumbnail_path: string,
@@ -216,7 +216,8 @@ proc new_temp_file(m: Media, ext: string): string =
 proc new_media*(url: Uri): Media =
   result.url = url
   let dict = block:
-    const fields = ["title", "upload_date", "timestamp", "duration", "thumbnail"]
+    const fields =
+      ["title", "upload_date", "timestamp", "duration", "thumbnail", "uploader"]
     let args = block:
       var r = @["--skip-download"]
       for k in fields:
@@ -225,7 +226,19 @@ proc new_media*(url: Uri): Media =
       r.add $url
       r
     to_table fields.zip split_lines "yt-dlp".execute args
-  result.title = dict["title"]
+
+  let splitted = dict["title"].split("-", 1).map (s: string) => s.strip
+  if not url.is_bandcamp_url or splitted.len == 1:
+    if "uploader" notin dict or dict["uploader"] == "":
+      result.performer = none(string)
+      result.title = dict["title"]
+    else:
+      result.performer = some(dict["uploader"])
+      result.title = dict["title"]
+  else:
+    result.performer = some(splitted[0])
+    result.title = splitted[1]
+
   if dict["duration"] == "NA":
     raise new_exception(
       DurationNotAvailableError, &"Duration value not available for media at {url}"

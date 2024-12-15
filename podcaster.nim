@@ -42,7 +42,10 @@ proc upload*(podcaster: var Podcaster, url: Uri): seq[Path] =
       var r: seq[Path]
       for url in parsed.playlist.items podcaster.reverse_order:
         if is_bandcamp and url notin podcaster.cache:
-          r &= podcaster.upload url
+          if parsed.playlist.kind == pBandcampAlbum:
+            r &= podcaster.upload url
+          else:
+            remove_thumbnails podcaster.upload url
           podcaster.cache.incl url
         else:
           remove_thumbnails podcaster.upload url
@@ -59,6 +62,7 @@ proc upload*(podcaster: var Podcaster, url: Uri): seq[Path] =
       while true:
         try:
           podcaster.downloader.download_thumbnail parsed.media
+          result.add parsed.media.thumbnail_path.Path
           r = some(podcaster.downloader.download parsed.media)
           break
         except BandcampError, DurationNotAvailableError:
@@ -69,13 +73,13 @@ proc upload*(podcaster: var Podcaster, url: Uri): seq[Path] =
       r
     if is_some(audio):
       podcaster.uploader.upload(
-        audio.get, parsed.media.title, parsed.media.thumbnail_path
+        audio.get, parsed.media.performer, parsed.media.title,
+        parsed.media.thumbnail_path,
       )
     if is_bandcamp:
       podcaster.cache.incl url
     else:
       podcaster.cache.incl parsed.media
-    result.add parsed.media.thumbnail_path.Path
 
 proc get_reverse_order(cache: Cache): bool =
   let reverse_order_arg = get_env "podcaster_from_first"

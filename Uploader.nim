@@ -1,4 +1,4 @@
-import std/[uri, os, times, enumerate, httpclient, logging, strformat]
+import std/[uri, os, times, enumerate, httpclient, logging, strformat, options]
 
 import ytdlp
 
@@ -8,15 +8,23 @@ var default_http_client* = new_http_client()
 
 type Uploader* = tuple[token: string, chat_id: string]
 
-proc upload*(uploader: Uploader, a: Audio, title: string, thumbnail_path: string) =
+proc upload*(
+    uploader: Uploader,
+    a: Audio,
+    performer: Option[string],
+    title: string,
+    thumbnail_path: string,
+) =
   if a.path.get_file_size >= max_uploaded_audio_size:
     for i, a_part in enumerate a.split max_uploaded_audio_size:
-      uploader.upload(a_part, &"{title} - {i + 1}", thumbnail_path)
+      uploader.upload(a_part, performer, &"{title} - {i + 1}", thumbnail_path)
     return
 
   var multipart = new_multipart_data()
   multipart.add_files {"audio": a.path, "thumbnail": thumbnail_path}
   multipart["chat_id"] = uploader.chat_id
+  if is_some performer:
+    multipart["performer"] = performer.get
   multipart["title"] = title
   multipart["duration"] = $a.duration.in_seconds
 
