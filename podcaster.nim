@@ -10,13 +10,24 @@ import Downloader
 import Uploader
 
 type Podcaster* =
-  tuple[cache: Cache, downloader: Downloader, uploader: Uploader, reverse_order: bool]
+  tuple[cache: Cache, downloader: Downloader, uploader: Uploader, from_first: bool]
 
 proc remove_thumbnails(paths: seq[Path]) =
   for p in paths:
     p.remove_file
 
-proc upload*(podcaster: var Podcaster, url: Uri): seq[Path] =
+type UploadResult = tuple[thumbnails_to_remove: seq[Path], cascade_stop: bool]
+
+template process_upload_result(r: UploadResult): untyped =
+  if r.cascade_stop:
+    remove_thumbnails r.thumbnails_to_remove
+    return
+  if parsed.playlist.kind == pBandcampAlbum:
+    result.thumbnails_to_remove &= r.thumbnails_to_remove
+  else:
+    remove_thumbnails r.thumbnails_to_remove
+
+proc upload*(podcaster: var Podcaster, url: Uri): UploadResult =
   let is_bandcamp = is_bandcamp_url url
   if is_bandcamp and (url in podcaster.cache):
     return
@@ -38,23 +49,14 @@ proc upload*(podcaster: var Podcaster, url: Uri): seq[Path] =
   if parsed.kind == pPlaylist:
     if parsed.playlist.kind notin [pBandcampArtist, pYoutubeChannel]:
       log(lvl_info, &"<-- {parsed.playlist.uploader} - {parsed.playlist.title}")
-    remove_thumbnails block:
-      var r: seq[Path]
-      for url in parsed.playlist.items podcaster.reverse_order:
-        if is_bandcamp and url notin podcaster.cache:
-          if parsed.playlist.kind == pBandcampAlbum:
-            r &= podcaster.upload url
-          else:
-            remove_thumbnails podcaster.upload url
-          podcaster.cache.incl url
-        else:
-          remove_thumbnails podcaster.upload url
-      r
+    for url in parsed.playlist.items podcaster.from_first:
+      process_upload_result podcaster.upload(url)
     if is_bandcamp and parsed.playlist.kind != pBandcampArtist:
       podcaster.cache.incl url
   elif parsed.kind == pMedia:
     if parsed.media in podcaster.cache:
-      if not podcaster.reverse_order and not is_bandcamp:
+      if not podcaster.from_first:
+        result.cascade_stop = true
         return
       return
     let audio = block:
@@ -62,7 +64,7 @@ proc upload*(podcaster: var Podcaster, url: Uri): seq[Path] =
       while true:
         try:
           podcaster.downloader.download_thumbnail parsed.media
-          result.add parsed.media.thumbnail_path.Path
+          result.thumbnails_to_remove.add parsed.media.thumbnail_path.Path
           r = some(podcaster.downloader.download parsed.media)
           break
         except BandcampError, DurationNotAvailableError:
@@ -81,10 +83,10 @@ proc upload*(podcaster: var Podcaster, url: Uri): seq[Path] =
     else:
       podcaster.cache.incl parsed.media
 
-proc get_reverse_order(cache: Cache): bool =
-  let reverse_order_arg = get_env "podcaster_from_first"
-  if reverse_order_arg.len > 0:
-    case reverse_order_arg
+proc get_from_first(cache: Cache): bool =
+  let from_first_arg = get_env "podcaster_from_first"
+  if from_first_arg.len > 0:
+    case from_first_arg
     of "true":
       return true
     of "false":
@@ -129,7 +131,7 @@ when is_main_module:
         thumbnail_scale_width: 200,
       ),
       uploader: (token: get_env "podcaster_token", chat_id: chat_id),
-      reverse_order: get_reverse_order(cache),
+      from_first: get_from_first(cache),
     )
 
     try:
