@@ -163,19 +163,41 @@ proc download_page(url: Uri): string =
       return decode l
 
 iterator items*(playlist: Playlist, from_first: bool = false): Uri =
-  if playlist.kind in [pYoutubeChannel, pYoutubeChannel, pBandcampAlbum]:
-    let output_lines = exec_process(
-      "yt-dlp",
-      args = block:
-        var a = @["--flat-playlist", "--print", "url", $playlist.url]
-        if from_first:
-          a &= @["--playlist-items", "::-1"]
-        a,
-      options = {po_use_path},
-    ).split_lines
+  log(
+    lvl_debug, &"items for {playlist.kind} {playlist.url}, from_first is {from_first}"
+  )
+  if playlist.kind == pBandcampAlbum:
+    let args = block:
+      var a = @["--flat-playlist", "--print", "url", $playlist.url]
+      if from_first:
+        a &= @["--playlist-items", "::-1"]
+      a
+    let output_lines = split_lines "yt-dlp".execute args
     for l in output_lines:
       if l.starts_with "http":
         yield parse_uri l
+  elif playlist.kind in [pYoutubeChannel, pYoutubePlaylist]:
+    var i = 0
+    while true:
+      let query =
+        if from_first:
+          &"{i - 1}{i - 1}:-1"
+        else:
+          &"{i}:{i + 1}:1"
+      try:
+        yield parse_uri (
+          "yt-dlp".execute @[
+            "--flat-playlist",
+            "--print",
+            "url",
+            "--playlist-items",
+            query,
+            $playlist.url,
+          ]
+        ).split_lines[0]
+      except AssertionDefect:
+        break
+      i += 1
   elif playlist.kind == pBandcampArtist:
     let page = download_page playlist.url
     var urls = block:
@@ -288,6 +310,7 @@ type
       media*: Media
 
 proc parse*(url: Uri): Parsed =
+  log(lvl_debug, &"parse url '{url}'")
   if (($url).match bandcamp_track_url_regex).is_some or
       (($url).match youtube_video_url_regex).is_some:
     return Parsed(kind: pMedia, media: new_media(url))
