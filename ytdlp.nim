@@ -173,7 +173,10 @@ iterator items*(playlist: Playlist, from_first: bool = false): Uri =
       if from_first:
         a &= @["--playlist-items", "::-1"]
       a
-    let output_lines = split_lines "yt-dlp".execute args
+    try:
+      let output_lines = split_lines "yt-dlp".execute args
+    except BandcampError:
+      return
     for l in output_lines:
       if l.starts_with "http":
         yield parse_uri l
