@@ -113,12 +113,13 @@ proc new_command_process(command: string, args: seq[string]): CommandProcess =
 proc wait_for_exit(p: CommandProcess): string =
   try:
     do_assert p.process.wait_for_exit == 0
-  except AssertionDefect:
+  except:
     result = p.process.output_stream.read_all
     log(lvl_warn, &"command '{p.command_string}' failed:\n{result}")
     check_substring_exceptions(result)
     raise
   result = p.process.output_stream.read_all
+  check_substring_exceptions(result)
   p.process.close
 
 proc execute(command: string, args: seq[string]): string =
