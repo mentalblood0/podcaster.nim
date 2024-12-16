@@ -293,14 +293,18 @@ proc download_thumbnail*(media: Media, scale_width: int) =
     return
   let possible_original_paths =
     ["jpg", "webp"].map (e: string) => media.thumbnail_url.new_temp_file "original." & e
-  discard "yt-dlp".execute @[
-    $media.url,
-    "--write-thumbnail",
-    "--skip-download",
-    "-o",
-    $possible_original_paths[0].change_file_ext "",
-  ]
-  let original_path = possible_original_paths.filter(file_exists)[0]
+  let original_path = block:
+    var existent_paths: seq[string]
+    while existent_paths.len == 0:
+      discard "yt-dlp".execute @[
+        $media.url,
+        "--write-thumbnail",
+        "--skip-download",
+        "-o",
+        $possible_original_paths[0].change_file_ext "",
+      ]
+      existent_paths = possible_original_paths.filter(file_exists)
+    existent_paths[0]
   let converted_path = media.thumbnail_url.new_temp_file "converted.png"
   discard "ffmpeg".execute @["-i", original_path, converted_path]
   discard "ffmpeg".execute @[
