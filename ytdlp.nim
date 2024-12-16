@@ -78,8 +78,7 @@ type
 proc check_substring_exceptions(command_output: string) =
   if is_some command_output.match re"ERROR: \[Bandcamp\] \d+: No video formats found!;":
     raise new_exception(BandcampNoVideoFormatsFoundError, command_output)
-  if "ERROR: [Bandcamp:album] vhs-tapes: The page doesn't contain any tracks;" in
-      command_output:
+  if "The page doesn't contain any tracks;" in command_output:
     raise new_exception(BandcampNoTracksOnPageError, command_output)
   if "SSL: UNEXPECTED_EOF_WHILE_READING" in command_output:
     raise new_exception(SslUnexpectedEofError, command_output)
