@@ -70,10 +70,12 @@ type
   BandcampNoVideoFormatsFoundError* = object of BandcampError
   BandcampNoTracksOnPageError* = object of BandcampError
   DurationNotAvailableError* = object of ValueError
-  SslUnexpectedEofError* = object of AssertionDefect
-  UnableToConnectToProxyError* = object of AssertionDefect
-  ReadTimedOutError* = object of AssertionDefect
-  UnableToFetchPoTokenError* = object of AssertionDefect
+
+  YtDlpNetworkError* = object of IOError
+  SslUnexpectedEofError* = object of YtDlpNetworkError
+  UnableToConnectToProxyError* = object of YtDlpNetworkError
+  ReadTimedOutError* = object of YtDlpNetworkError
+  UnableToFetchPoTokenError* = object of YtDlpNetworkError
 
 proc check_substring_exceptions(command_output: string) =
   if is_some command_output.match re"ERROR: \[Bandcamp\] \d+: No video formats found!;":
@@ -123,8 +125,7 @@ proc execute(command: string, args: seq[string]): string =
   while true:
     try:
       return wait_for_exit command.new_command_process args
-    except SslUnexpectedEofError, UnableToConnectToProxyError, ReadTimedOutError,
-        UnableToFetchPoTokenError:
+    except YtDlpNetworkError:
       continue
 
 type PlaylistKind* = enum
@@ -166,7 +167,8 @@ iterator items*(playlist: Playlist, from_first: bool = false): Uri =
   log(
     lvl_debug, &"items for {playlist.kind} {playlist.url}, from_first is {from_first}"
   )
-  if playlist.kind == pBandcampAlbum:
+  if (playlist.kind == pBandcampAlbum) or
+      ((playlist.kind in [pYoutubeChannel, pYoutubePlaylist]) and from_first):
     let args = block:
       var a = @["--flat-playlist", "--print", "url", $playlist.url]
       if from_first:
@@ -189,14 +191,17 @@ iterator items*(playlist: Playlist, from_first: bool = false): Uri =
           &"{i - 1}:{i - 1}:{step}"
         else:
           &"{i}:{i + 1}:{step}"
-      let output = (
+      let output_lines = (
         "yt-dlp".execute @[
           "--flat-playlist", "--print", "url", "--playlist-items", query, $playlist.url
         ]
-      ).split_lines[0]
-      if output == "":
+      ).split_lines
+      if output_lines.len == 0:
         break
-      yield parse_uri output
+      for l in output_lines:
+        if l.starts_with "http":
+          yield parse_uri l
+          break
       i += step
   elif playlist.kind == pBandcampArtist:
     let page = download_page playlist.url
@@ -347,7 +352,7 @@ proc audio*(media: Media, kilobits_per_second: Option[int] = none(int)): Audio =
 
 type ConversionParams* = tuple[bitrate: int, samplerate: int, channels: int]
 
-proc convert*(a: Audio, cp: ConversionParams = (128, 44100, 2)): Audio =
+proc convert*(a: Audio, cp: ConversionParams): Audio =
   let converted_path = a.new_temp_file "converted"
   discard "ffmpeg".execute @[
     "-i",

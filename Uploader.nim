@@ -28,6 +28,7 @@ proc upload*(
     multipart["performer"] = performer.get
   multipart["title"] = title
   multipart["duration"] = $a.duration.in_seconds
+  multipart["disable_notification"] = "true"
 
   log(lvl_debug, &"multipart is:\n{multipart}")
 

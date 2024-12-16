@@ -75,8 +75,9 @@ proc upload_nonbandcamp(podcaster: var Podcaster, url: Uri): bool =
       try:
         podcaster.downloader.download_thumbnail parsed.media
         podcaster.downloader.download parsed.media
-      except BandcampError, DurationNotAvailableError:
+      except DurationNotAvailableError:
         podcaster.cache.incl parsed.media
+        parsed.media.thumbnail_path.Path.remove_file
         return
     podcaster.uploader.upload(
       a, parsed.media.performer, parsed.media.title, parsed.media.thumbnail_path
