@@ -76,9 +76,10 @@ type
   UnableToConnectToProxyError* = object of YtDlpNetworkError
   ReadTimedOutError* = object of YtDlpNetworkError
   UnableToFetchPoTokenError* = object of YtDlpNetworkError
+  IncompleteReadError* = object of YtDlpNetworkError
 
 proc check_substring_exceptions(command_output: string) =
-  if is_some command_output.match re"ERROR: \[Bandcamp\] \d+: No video formats found!;":
+  if "No video formats found!;" in command_output:
     raise new_exception(BandcampNoVideoFormatsFoundError, command_output)
   if "The page doesn't contain any tracks;" in command_output:
     raise new_exception(BandcampNoTracksOnPageError, command_output)
@@ -90,7 +91,8 @@ proc check_substring_exceptions(command_output: string) =
     raise new_exception(ReadTimedOutError, command_output)
   if "Unable to fetch PO Token for mweb client" in command_output:
     raise new_exception(UnableToFetchPoTokenError, command_output)
-  raise
+  if "IncompleteRead" in command_output:
+    raise new_exception(IncompleteReadError, command_output)
 
 type CommandProcess = tuple[command: string, args: seq[string], process: Process]
 
@@ -155,11 +157,9 @@ proc new_playlist*(url: Uri): Playlist =
     )
 
 proc download_page(url: Uri): string =
-  let output_lines = exec_process(
-    "yt-dlp",
-    args = ["--flat-playlist", "--skip-download", "--dump-pages", $(url / "music")],
-    options = {po_use_path},
-  ).split_lines
+  let output_lines = split_lines "yt-dlp".execute @[
+    "--flat-playlist", "--skip-download", "--dump-pages", $(url / "music")
+  ]
   for l in output_lines:
     if is_some l.match page_regex:
       return decode l
