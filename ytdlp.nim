@@ -25,8 +25,7 @@ let bandcamp_albums_urls_regexes* =
 let bandcamp_url_regex* = re"https?:\/\/(?:((?:\w|-)+)\.)?bandcamp\.com.*$"
 let bandcamp_artist_url_regex* =
   re"https?:\/\/(?:(?:\w|-)+\.)?bandcamp\.com(?:\/|(?:\/music\/?))?$"
-let bandcamp_album_url_regex* =
-  re"https?:\/\/(?:(?:\w|-)+\.)?bandcamp\.com\/album\/(?:(?:(?:\w|-)+)|(?:-*\d+))\/?$"
+let bandcamp_album_url_regex* = re"https?:\/\/(?:(?:\w|-)+\.)?bandcamp\.com\/album\/.+$"
 let bandcamp_track_url_regex* =
   re"https?:\/\/(?:(?:\w|-)+\.)?bandcamp\.com\/track\/[^\/]+\/?$"
 let youtube_channel_url_regex* =
@@ -157,9 +156,14 @@ proc new_playlist*(url: Uri): Playlist =
     )
 
 proc download_page(url: Uri): string =
-  let output_lines = split_lines "yt-dlp".execute @[
-    "--flat-playlist", "--skip-download", "--dump-pages", $(url / "music")
-  ]
+  # let output_lines = split_lines "yt-dlp".execute @[
+  #   "--flat-playlist", "--skip-download", "--dump-pages", $(url / "music")
+  # ]
+  let output_lines = exec_process(
+    "yt-dlp",
+    args = ["--flat-playlist", "--skip-download", "--dump-pages", $(url / "music")],
+    options = {po_use_path},
+  ).split_lines
   for l in output_lines:
     if is_some l.match page_regex:
       return decode l
