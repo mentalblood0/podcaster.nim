@@ -3,55 +3,57 @@
 # by the University of Cambridge, England. Source can be found at
 # ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/
 
-import std/[strformat, sugar, os, json, math, nre, sequtils, strutils, logging, sets]
+import std/[strformat, json, math, nre, strutils, sets, hashes, options]
 
 import common
 import cache
 import commands
-import tempfiles
-import downloader
 
-type ItermediateItem = tuple[url: string, title: string, duration: int, hash: string]
+type
+  IntermediateItem = tuple[url: string, title: string, duration: int]
 
-iterator items*(downloader: Downloader, playlist_url: string): Item =
+  YoutubeUrl* = distinct string
+
+func cache_item(ii: IntermediateItem): JsonNode =
+  %*{"title": ii.title, "duration": ii.duration}
+
+iterator items*(playlist_url: YoutubeUrl): Item =
   var cache = block:
-    let m = playlist_url.match re"https?:\/\/(?:www\.)?youtube\.com\/@?((?:\w|\.)+)\/(?:(?:videos)|(?:playlist\?list=(?:\w|-)+))\/?$"
+    let m = playlist_url.string.match re"https?:\/\/(?:www\.)?youtube\.com\/@?((?:\w|\.)+)\/(?:(?:videos)|(?:playlist\?list=(?:\w|-)+))\/?$"
     if not is_some m:
       raise new_exception(
-        UnsupportedUrlError, &"Youtube module does not support URL '{playlist_url}'"
+        UnsupportedUrlError,
+        &"Youtube module does not support URL '{playlist_url.string}'",
       )
     new_cache m.get.captures[0]
 
   let intermediate_items = block:
-    var r: OrderedSet[ItermediateItem]
+    var r: OrderedSet[IntermediateItem]
     let output_lines = (
       "yt-dlp".execute @[
-        "--flat-playlist", "--print", "url", "--print", "title", "--print", "duration",
-        playlist_url,
+        "--flat-playlist", "--playlist-items", "::-1", "--print", "url", "--print",
+        "title", "--print", "duration", playlist_url.string,
       ]
     ).split_lines
     for i in 0 .. (int math.floor output_lines.len / 3 - 1):
       let title = output_lines[i + 1]
       let duration = parse_int output_lines[i + 2]
-      let hash = cache.hash($ %*{"title": title, "duration": duration})
-      if hash notin cache:
-        r.incl (url: output_lines[i], title: title, duration: duration, hash: hash)
+      let ii = (url: output_lines[i], title: title, duration: duration)
+      if ii.cache_item notin cache:
+        r.incl ii
     r
 
   if intermediate_items.len > 0:
     let performer = strip "yt-dlp".execute @[
       "--skip-download", "--playlist-items", "1", "--print", "playlist_uploader",
-      playlist_url,
+      playlist_url.string,
     ]
     for ii in intermediate_items:
-      let thumbnail_path = downloader.download_thumbnail(ii.url, ii.hash)
-      let audio_path = downloader.download_audio(ii.url, ii.hash)
+      let decoupled = decouple_performer_and_title(performer, ii.title)
       yield Item(
-        audio_path: audio_path,
-        thumbnail_path: thumbnail_path,
-        performer: performer,
-        title: ii.title,
+        url: ii.url,
+        performer: decoupled.performer,
+        title: decoupled.title,
         duration: ii.duration,
       )
-      thumbnail_path.remove_file
-      audio_path.remove_file
+      cache.incl ii.cache_item

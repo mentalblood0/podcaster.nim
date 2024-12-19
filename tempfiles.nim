@@ -1,13 +1,13 @@
 import std/[sets, paths, exitprocs, os, sugar]
 
-var temp_files_dir* = "/mnt/tmpfs".Path
+var temp_files_dir* = "/mnt/tmpfs"
 var temp_files: HashSet[string]
 
 proc new_temp_file*(name: string): string =
-  result = string temp_files_dir / name.Path
+  result = string temp_files_dir.Path / name.Path
   temp_files.incl result
 
-proc remove_temp_files() =
+proc remove_temp_files*() =
   for p in temp_files:
     p.remove_file
 

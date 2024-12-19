@@ -1,11 +1,7 @@
-import xxhash
-import nint128
-
-import
-  std/[files, dirs, appdirs, sets, paths, syncio, strformat, logging, base64, strutils]
+import std/[files, dirs, appdirs, sets, paths, syncio, strformat, logging, json]
 
 type Cache* = object
-  hashes: HashSet[string]
+  items: HashSet[JsonNode]
   path: string
 
 proc new_cache*(name: string): Cache =
@@ -14,19 +10,16 @@ proc new_cache*(name: string): Cache =
   log(lvl_debug, &"new cache at {result.path}")
   if file_exists result.path.Path:
     for l in lines result.path:
-      result.hashes.incl l
+      result.items.incl parse_json l
   else:
     create_dir result.path.Path.split_path.head
 
-func hash*(cache: Cache, id: string): string =
-  id.XXH3_128bits.to_bytes_b_e.encode(safe = true).strip(leading = false, chars = {'='})
-
-proc incl*(c: var Cache, h: string) =
-  if h notin c.hashes:
-    let f = c.path.open fm_append
-    f.write_line h
+proc incl*(cache: var Cache, item: JsonNode) =
+  if item notin cache.items:
+    cache.items.incl item
+    let f = cache.path.open fm_append
+    f.write_line $item
     f.close
-    c.hashes.incl h
 
-proc `notin`*(h: string, c: Cache): bool =
-  h notin c.hashes
+proc `notin`*(item: JsonNode, cache: Cache): bool =
+  item notin cache.items

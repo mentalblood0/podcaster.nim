@@ -3,12 +3,15 @@ import std/[options, sequtils, strformat, os, logging, sugar]
 import tempfiles
 import commands
 
-type ConversionParams* = tuple[bitrate: int, samplerate: int, channels: int]
+type ConversionParams* = object
+  bitrate*: int
+  samplerate*: int
+  channels*: int
 
 type Downloader* = object
-  bitrate: Option[int]
-  conversion_params: Option[ConversionParams]
-  thumbnail_scale_width: int
+  bitrate*: Option[int]
+  conversion_params*: Option[ConversionParams]
+  thumbnail_scale_width*: int
 
 proc download_audio*(downloader: Downloader, url: string, name: string): string =
   let original_path = name
