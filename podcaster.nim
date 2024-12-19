@@ -1,4 +1,4 @@
-import std/[options, logging, marshal, appdirs, paths, cmdline, hashes]
+import std/[options, logging, json, appdirs, paths, cmdline, hashes]
 
 import downloader
 import uploader
@@ -32,8 +32,9 @@ proc upload(podcaster: Podcaster, url: string, chat_id: string) =
     podcaster.uploader.upload(item, downloaded, chat_id)
 
 when is_main_module:
-  let config =
-    to[Config] read_file string get_config_dir() / "podcaster".Path / Path param_str 1
+  let config = (
+    parse_json read_file string get_config_dir() / "podcaster".Path / Path param_str 1
+  ).to Config
 
   ytdlp_proxy = config.ytdlp_proxy
   temp_files_dir = config.temp_files_dir
