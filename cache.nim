@@ -5,8 +5,7 @@ type Cache* = object
   path: string
 
 proc new_cache*(name: string): Cache =
-  result.path =
-    string (get_data_dir() / "podcaster".Path / name.Path).add_file_ext "txt"
+  result.path = (get_data_dir() / "podcaster".Path / name.Path).string & ".txt"
   log(lvl_debug, &"new cache at {result.path}")
   if file_exists result.path.Path:
     for l in lines result.path:
