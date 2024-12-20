@@ -15,12 +15,14 @@ var default_http_client* = new_http_client()
 type Uploader* = object
   token: string
 
-iterator split(audio_path: string, total_duration: int): string =
+iterator split(
+    audio_path: string, total_duration: int
+): tuple[path: string, duration: int] =
   let parts = int ceil audio_path.get_file_size / max_uploaded_audio_size
+  let part_duration = int ceil total_duration / parts
   let processes = collect:
     for i in 0 .. (parts - 1):
-      let part_path =
-        (&"{audio_path.Path.split_file.name.string}_{i + 1}").new_temp_file
+      let part_path = (&"{audio_path.Path.split_file.name.string}_{i + 1}").new_temp_file.add_file_ext "mp3"
       (
         process: "ffmpeg".new_command_process @[
           "-y",
@@ -32,7 +34,7 @@ iterator split(audio_path: string, total_duration: int): string =
           "-i",
           audio_path,
           "-t",
-          $int ceil total_duration / parts,
+          $part_duration,
           "-acodec",
           "copy",
           part_path,
@@ -42,17 +44,18 @@ iterator split(audio_path: string, total_duration: int): string =
   for p in processes:
     discard p.process.wait_for_exit
     assert p.path.get_file_size <= max_uploaded_audio_size
-    yield p.path
+    yield (path: p.path, duration: part_duration)
   audio_path.remove_file
 
 proc upload*(uploader: Uploader, item: Item, downloaded: Downloaded, chat_id: string) =
   if downloaded.audio_path.get_file_size >= max_uploaded_audio_size:
-    for i, part_path in enumerate downloaded.audio_path.split item.duration:
+    for i, part in enumerate downloaded.audio_path.split item.duration:
       var part_item = item
       part_item.title = &"{item.title} - {i + 1}"
+      part_item.duration = part.duration
       uploader.upload(
         part_item,
-        Downloaded(audio_path: part_path, thumbnail_path: downloaded.thumbnail_path),
+        Downloaded(audio_path: part.path, thumbnail_path: downloaded.thumbnail_path),
         chat_id,
       )
     return

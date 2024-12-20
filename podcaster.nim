@@ -1,4 +1,4 @@
-import std/[options, logging, json, appdirs, paths, cmdline, hashes]
+import std/[options, logging, json, appdirs, paths, cmdline, strutils, strformat]
 
 import downloader
 import uploader
@@ -11,6 +11,7 @@ import youtube
 type Task = object
   chat_id: string
   url: string
+  start_after_url: Option[string]
 
 type Podcaster = object
   downloader: Downloader
@@ -23,13 +24,19 @@ type Config = object
   podcaster: Podcaster
   tasks: seq[Task]
 
-proc upload(podcaster: Podcaster, url: string, chat_id: string) =
-  for item in url.YoutubeUrl.items:
+proc process_task(podcaster: Podcaster, task: Task) =
+  var skip = task.start_after_url.is_some
+  for item in task.url.YoutubeUrl.items:
+    if skip:
+      if task.start_after_url.get == item.url:
+        skip = false
+      continue
+    lvl_info.log &"process item {item}"
     let downloaded = Downloaded(
-      audio_path: podcaster.downloader.download_audio(item.url, $item.hash),
-      thumbnail_path: podcaster.downloader.download_thumbnail(item.url, $item.hash),
+      audio_path: podcaster.downloader.download_audio(item.url, item.name),
+      thumbnail_path: podcaster.downloader.download_thumbnail(item.url, item.name),
     )
-    podcaster.uploader.upload(item, downloaded, chat_id)
+    podcaster.uploader.upload(item, downloaded, task.chat_id)
 
 when is_main_module:
   let config = (
@@ -49,7 +56,7 @@ when is_main_module:
 
   for t in config.tasks:
     try:
-      config.podcaster.upload(t.url, t.chat_id)
+      config.podcaster.process_task t
     except:
       remove_temp_files()
       raise

@@ -1,4 +1,4 @@
-import std/[options, strutils, sugar, sequtils]
+import std/[options, strutils, sugar, sequtils, hashes]
 
 type
   Item* = object
@@ -15,6 +15,9 @@ type
 
 var ytdlp_proxy* = ""
 
+func name*(item: Item): string =
+  ($item.hash).strip(trailing = false, chars = {'-'})
+
 func decouple_performer_and_title*(
     performer: string, title: string
 ): tuple[performer: Option[string], title: string] =
@@ -25,5 +28,7 @@ func decouple_performer_and_title*(
     else:
       return (performer: some(splitted[0]), title: splitted[1])
 
-  if title.startswith performer:
+  if title.startswith performer & " -":
     return (performer: some(performer), title: title.split("-", 1)[1])
+
+  return (performer: some(performer), title: title)

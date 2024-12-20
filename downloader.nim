@@ -1,4 +1,4 @@
-import std/[options, sequtils, strformat, os, logging, sugar]
+import std/[options, sequtils, strformat, os, logging, sugar, paths]
 
 import tempfiles
 import commands
@@ -14,7 +14,8 @@ type Downloader* = object
   thumbnail_scale_width*: int
 
 proc download_audio*(downloader: Downloader, url: string, name: string): string =
-  let original_path = name
+  let original_path = name.new_temp_file
+  discard new_temp_file string name.Path.add_file_ext "part"
   block download:
     let format =
       if is_some downloader.bitrate:
@@ -44,17 +45,19 @@ proc download_audio*(downloader: Downloader, url: string, name: string): string 
     return original_path
 
 proc download_thumbnail*(downloader: Downloader, url: string, name: string): string =
+  let scaled_path = (&"{name}.png").new_temp_file
+  if scaled_path.file_exists:
+    return scaled_path
   let original_path = block:
     let original_name = &"{name}_o"
     let possible_original_paths =
       ["jpg", "webp"].map (e: string) => (&"{original_name}.{e}").new_temp_file
     discard "yt-dlp".execute @[
-      url, "--write-thumbnail", "--skip-download", "-o", original_name
+      url, "--write-thumbnail", "--skip-download", "-o", original_name.new_temp_file
     ]
     possible_original_paths.filter(file_exists)[0]
   let converted_path = (&"{name}_c.png").new_temp_file
   discard "ffmpeg".execute @["-i", original_path, converted_path]
-  let scaled_path = (&"{name}.png").new_temp_file
   discard "ffmpeg".execute @[
     "-i",
     converted_path,

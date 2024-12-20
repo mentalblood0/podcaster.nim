@@ -3,11 +3,12 @@
 # by the University of Cambridge, England. Source can be found at
 # ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/
 
-import std/[strformat, json, math, nre, strutils, sets, hashes, options]
+import std/[strformat, json, math, nre, strutils, sets, hashes, options, logging]
 
 import common
 import cache
 import commands
+import logging
 
 type
   IntermediateItem = tuple[url: string, title: string, duration: int]
@@ -35,12 +36,15 @@ iterator items*(playlist_url: YoutubeUrl): Item =
         "title", "--print", "duration", playlist_url.string,
       ]
     ).split_lines
-    for i in 0 .. (int math.floor output_lines.len / 3 - 1):
+    var i = 0
+    while i + 2 < output_lines.len:
       let title = output_lines[i + 1]
-      let duration = parse_int output_lines[i + 2]
+      let duration = int parse_float output_lines[i + 2]
       let ii = (url: output_lines[i], title: title, duration: duration)
       if ii.cache_item notin cache:
+        lvl_debug.log &"not in cache: {ii}"
         r.incl ii
+      i += 3
     r
 
   if intermediate_items.len > 0:
