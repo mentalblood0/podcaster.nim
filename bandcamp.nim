@@ -77,6 +77,7 @@ proc cache_until_including*(
 iterator items*(items_collector: var ItemsCollector[BandcampUrl]): Item =
   for au in items_collector.not_cached_albums_urls:
     let single = "/track/" in au
+    let thumbnail_id = ($au.hash).strip(trailing = false, chars = {'-'})
     let tracks_urls = block:
       if single:
         @[au]
@@ -109,7 +110,7 @@ iterator items*(items_collector: var ItemsCollector[BandcampUrl]): Item =
             @[tu.track_cache_item, au.album_cache_item]
           else:
             @[tu.track_cache_item],
-        thumbnail_id: ($au.hash).strip(trailing = false, chars = {'-'}),
+        thumbnail_id: thumbnail_id,
       )
 
 proc on_uploaded*(

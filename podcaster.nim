@@ -27,8 +27,8 @@ type Config = object
   tasks: seq[Task]
 
 template process_task(podcaster: typed, task: typed, T: untyped) =
-  lvl_debug.log "process task " & $task
   var collector = new_items_collector task.url.T
+  lvl_debug.log "process task " & $task
 
   if task.start_after_url.is_some:
     collector.cache_until_including task.start_after_url.get
