@@ -12,7 +12,8 @@ proc new_cache*(name: string): Cache =
     for l in lines result.path:
       result.items.incl parse_json l
     let finish = cpu_time()
-    lvl_debug.log &"loaded cache entries: {result.items.len} in {int (finish - start) * 1000000} microseconds"
+    let duration = init_duration(nanoseconds = int ((finish - start) * 1000000000))
+    lvl_debug.log &"loaded cache entries: {result.items.len} in {duration}"
   else:
     create_dir result.path.Path.split_path.head
 

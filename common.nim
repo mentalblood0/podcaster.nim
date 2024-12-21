@@ -26,14 +26,15 @@ var ytdlp_proxy* = ""
 func decouple_performer_and_title*(
     performer: string, title: string
 ): tuple[performer: Option[string], title: string] =
+  var p = performer
+  var t = title
+
   if performer in ["", "NA"]:
     let splitted = title.split("-", 1).map (s: string) => s.strip
     if splitted.len == 1:
-      return (performer: none(string), title: title)
+      return (performer: none(string), title: title.strip)
     else:
-      return (performer: some(splitted[0]), title: splitted[1])
+      p = splitted[0]
+      t = splitted[1]
 
-  if title.startswith performer & " -":
-    return (performer: some(performer), title: title.split("-", 1)[1])
-
-  return (performer: some(performer), title: title)
+  return (performer: some(p.strip), title: strip t.strip.replace p.strip & " -")
