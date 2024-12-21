@@ -79,15 +79,21 @@ proc upload*(uploader: Uploader, item: Item, downloaded: Downloaded, chat_id: st
   log(lvl_info, &"--> {log_string}")
 
   while true:
-    let response = default_http_client.request(
-      "https://api.telegram.org/bot" & uploader.token & "/sendAudio",
-      http_method = HttpPost,
-      multipart = multipart,
-    )
-    log(lvl_debug, &"response is {response.status} {response.body}")
-    if response.status.starts_with "429":
-      sleep(1000)
+    var response: Response
+    while true:
+      try:
+        response = default_http_client.request(
+          "https://api.telegram.org/bot" & uploader.token & "/sendAudio",
+          http_method = HttpPost,
+          multipart = multipart,
+        )
+        break
+      except:
+        continue
+    if not response.status.starts_with "200":
+      lvl_warn.log &"response is {response.status} {response.body}"
+      if response.status.starts_with "429":
+        sleep(1000)
       continue
-    do_assert response.status.starts_with "200"
     break
   downloaded.audio_path.remove_file

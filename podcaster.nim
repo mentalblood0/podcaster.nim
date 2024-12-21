@@ -5,6 +5,7 @@ import uploader
 import common
 import tempfiles
 import logging
+import commands
 
 import youtube
 
@@ -32,10 +33,14 @@ proc process_task(podcaster: Podcaster, task: Task) =
         skip = false
       continue
     lvl_info.log &"process item {item}"
-    let downloaded = Downloaded(
-      audio_path: podcaster.downloader.download_audio(item.url, item.name),
-      thumbnail_path: podcaster.downloader.download_thumbnail(item.url, item.name),
-    )
+    var downloaded: Downloaded
+    try:
+      downloaded = Downloaded(
+        audio_path: podcaster.downloader.download_audio(item.url, item.name),
+        thumbnail_path: podcaster.downloader.download_thumbnail(item.url, item.name),
+      )
+    except CommandFatalError:
+      continue
     podcaster.uploader.upload(item, downloaded, task.chat_id)
 
 when is_main_module:

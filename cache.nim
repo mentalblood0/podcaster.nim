@@ -1,4 +1,4 @@
-import std/[files, dirs, appdirs, sets, paths, syncio, strformat, logging, json]
+import std/[files, dirs, appdirs, sets, paths, syncio, json]
 
 type Cache* = object
   items: HashSet[JsonNode]
@@ -6,7 +6,6 @@ type Cache* = object
 
 proc new_cache*(name: string): Cache =
   result.path = (get_data_dir() / "podcaster".Path / name.Path).string & ".txt"
-  log(lvl_debug, &"new cache at {result.path}")
   if file_exists result.path.Path:
     for l in lines result.path:
       result.items.incl parse_json l
