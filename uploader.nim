@@ -22,7 +22,8 @@ iterator split(
   let part_duration = int ceil total_duration / parts
   let processes = collect:
     for i in 0 .. (parts - 1):
-      let part_path = (&"{audio_path.Path.split_file.name.string}_{i + 1}").new_temp_file.add_file_ext "mp3"
+      let part_path =
+        (&"{audio_path.Path.split_file.name.string}_{i + 1}.mp3").new_temp_file
       (
         process: "ffmpeg".new_command_process @[
           "-y",

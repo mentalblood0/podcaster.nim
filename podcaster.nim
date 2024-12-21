@@ -26,13 +26,17 @@ type Config = object
   tasks: seq[Task]
 
 proc process_task(podcaster: Podcaster, task: Task) =
+  var collector = new_items_collector task.url.YoutubeUrl
+
   var skip = task.start_after_url.is_some
-  for item in task.url.YoutubeUrl.items:
+  for item in collector:
     if skip:
       if task.start_after_url.get == item.url:
         skip = false
+      collector.on_uploaded item
       continue
     lvl_info.log &"process item {item}"
+
     var downloaded: Downloaded
     try:
       downloaded = Downloaded(
@@ -40,8 +44,11 @@ proc process_task(podcaster: Podcaster, task: Task) =
         thumbnail_path: podcaster.downloader.download_thumbnail(item.url, item.name),
       )
     except CommandFatalError:
+      collector.on_uploaded item
       continue
+
     podcaster.uploader.upload(item, downloaded, task.chat_id)
+    collector.on_uploaded(item, some(downloaded))
 
 when is_main_module:
   let config = (
