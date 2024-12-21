@@ -19,5 +19,8 @@ proc incl*(cache: var Cache, item: JsonNode) =
     f.write_line $item
     f.close
 
+proc `in`*(item: JsonNode, cache: Cache): bool =
+  item in cache.items
+
 proc `notin`*(item: JsonNode, cache: Cache): bool =
-  item notin cache.items
+  not (item in cache)

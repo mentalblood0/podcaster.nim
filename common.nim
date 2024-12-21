@@ -1,4 +1,4 @@
-import std/[options, strutils, sugar, sequtils, hashes]
+import std/[options, strutils, sugar, sequtils, hashes, json]
 
 import cache
 
@@ -8,6 +8,7 @@ type
     performer*: Option[string]
     title*: string
     duration*: int
+    cache_items*: seq[JsonNode]
 
   ItemsCollector*[T] = object
     url*: T

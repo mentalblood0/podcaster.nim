@@ -15,6 +15,9 @@ type
 
   YoutubeUrl* = distinct string
 
+func cache_item(ii: IntermediateItem): JsonNode =
+  %*{"title": ii.title, "duration": ii.duration}
+
 proc new_items_collector*(playlist_url: YoutubeUrl): ItemsCollector[YoutubeUrl] =
   let m = playlist_url.string.match re"https?:\/\/(?:www\.)?youtube\.com\/@?((?:\w|\.)+)\/(?:(?:videos)|(?:playlist\?list=(?:\w|-)+))\/?$"
   if not is_some m:
@@ -36,15 +39,17 @@ iterator items*(items_collector: var ItemsCollector[YoutubeUrl]): Item =
     ).split_lines
     var i = 0
     while i + 2 < output_lines.len:
-      let title = output_lines[i + 1]
-      let duration = int parse_float output_lines[i + 2]
-      let ii = (url: output_lines[i], title: title, duration: duration)
-      let cache_item = %*{"title": ii.title, "duration": ii.duration}
-      if cache_item notin items_collector.cache:
-        lvl_debug.log &"not in cache: {ii}"
+      let ii = (
+        url: output_lines[i],
+        title: output_lines[i + 1],
+        duration: int parse_float output_lines[i + 2],
+      )
+      if ii.cache_item notin items_collector.cache:
         r.incl ii
       i += 3
     r
+
+  lvl_info.log &"items not in cache: {intermediate_items.len}"
 
   if intermediate_items.len > 0:
     let performer = strip "yt-dlp".execute @[
@@ -58,6 +63,7 @@ iterator items*(items_collector: var ItemsCollector[YoutubeUrl]): Item =
         performer: decoupled.performer,
         title: decoupled.title,
         duration: ii.duration,
+        cache_items: @[ii.cache_item],
       )
 
 proc on_uploaded*(
@@ -65,6 +71,7 @@ proc on_uploaded*(
     item: Item,
     downloaded: Option[Downloaded] = none(Downloaded),
 ) =
-  items_collector.cache.incl %*{"title": item.title, "duration": item.duration}
+  for c in item.cache_items:
+    items_collector.cache.incl c
   if downloaded.is_some:
     downloaded.get.thumbnail_path.remove_file
