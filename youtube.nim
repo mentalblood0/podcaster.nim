@@ -49,13 +49,12 @@ iterator items*(items_collector: var ItemsCollector[YoutubeUrl]): Item =
       i += 3
     r
 
-  lvl_info.log &"items not in cache: {intermediate_items.len}"
-
   if intermediate_items.len > 0:
     let performer = strip "yt-dlp".execute @[
       "--skip-download", "--playlist-items", "1", "--print", "playlist_uploader",
       items_collector.url.string,
     ]
+    lvl_info.log &"{performer} items not in cache: {intermediate_items.len}"
     for ii in intermediate_items:
       let decoupled = decouple_performer_and_title(performer, ii.title)
       yield Item(
