@@ -73,6 +73,7 @@ iterator items*(items_collector: var ItemsCollector[YoutubeUrl]): Item =
         title: decoupled.title,
         duration: ii.duration,
         cache_items: @[ii.cache_item],
+        thumbnail_id: ($ii.hash).strip(trailing = false, chars = {'-'}),
       )
 
 proc on_uploaded*(
