@@ -1,4 +1,4 @@
-import std/[options, strutils, sugar, sequtils, hashes, json]
+import std/[options, strutils, sugar, sequtils, json]
 
 import cache
 
@@ -9,6 +9,7 @@ type
     title*: string
     duration*: int
     cache_items*: seq[JsonNode]
+    thumbnail_id*: string
 
   ItemsCollector*[T] = object
     url*: T
@@ -21,9 +22,6 @@ type
   UnsupportedUrlError* = object of ValueError
 
 var ytdlp_proxy* = ""
-
-func name*(item: Item): string =
-  ($item.hash).strip(trailing = false, chars = {'-'})
 
 func decouple_performer_and_title*(
     performer: string, title: string

@@ -28,26 +28,36 @@ proc new_items_collector*(playlist_url: YoutubeUrl): ItemsCollector[YoutubeUrl] 
   result.url = playlist_url
   result.cache = new_cache m.get.captures[0]
 
+proc get_intermediate_items(
+    items_collector: ItemsCollector[YoutubeUrl]
+): OrderedSet[IntermediateItem] =
+  let output_lines = (
+    "yt-dlp".execute @[
+      "--flat-playlist", "--playlist-items", "::-1", "--print", "url", "--print",
+      "title", "--print", "duration", items_collector.url.string,
+    ]
+  ).split_lines
+  var i = 0
+  while i + 2 < output_lines.len:
+    let ii = (
+      url: output_lines[i],
+      title: output_lines[i + 1],
+      duration: int parse_float output_lines[i + 2],
+    )
+    if ii.cache_item notin items_collector.cache:
+      result.incl ii
+    i += 3
+
+proc cache_until_including*(
+    items_collector: var ItemsCollector[YoutubeUrl], last_url: string
+) =
+  for ii in items_collector.get_intermediate_items:
+    items_collector.cache.incl ii.cache_item
+    if ii.url == last_url:
+      break
+
 iterator items*(items_collector: var ItemsCollector[YoutubeUrl]): Item =
-  let intermediate_items = block:
-    var r: OrderedSet[IntermediateItem]
-    let output_lines = (
-      "yt-dlp".execute @[
-        "--flat-playlist", "--playlist-items", "::-1", "--print", "url", "--print",
-        "title", "--print", "duration", items_collector.url.string,
-      ]
-    ).split_lines
-    var i = 0
-    while i + 2 < output_lines.len:
-      let ii = (
-        url: output_lines[i],
-        title: output_lines[i + 1],
-        duration: int parse_float output_lines[i + 2],
-      )
-      if ii.cache_item notin items_collector.cache:
-        r.incl ii
-      i += 3
-    r
+  let intermediate_items = items_collector.get_intermediate_items()
 
   if intermediate_items.len > 0:
     let performer = strip "yt-dlp".execute @[

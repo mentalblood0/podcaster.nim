@@ -5,22 +5,18 @@
 
 import
   std/[
-    strformat, json, math, nre, strutils, sets, hashes, options, logging, os, sugar,
-    sequtils, base64, uri, algorithm, enumerate,
+    strformat, json, math, nre, strutils, sets, hashes, options, os, sugar, sequtils,
+    base64, uri, algorithm, enumerate,
   ]
 
 import common
 import cache
 import commands
-import logging
 
-type
-  IntermediateItem = tuple[url: string, title: string, duration: int]
-
-  BandcampUrl* = distinct string
+type BandcampUrl* = distinct string
 
 proc new_items_collector*(artist_url: BandcampUrl): ItemsCollector[BandcampUrl] =
-  let m = artist_url.string.match re"https?:\/\/((?:\w|-)+)\.bandcamp\.com\/music\/?$"
+  let m = artist_url.string.match re"https?:\/\/((?:\w|-)+)\.bandcamp\.com\/?$"
   if not is_some m:
     raise new_exception(
       UnsupportedUrlError, &"Bandcamp module does not support URL '{artist_url.string}'"
@@ -34,73 +30,87 @@ func album_cache_item(au: string): JsonNode =
 func track_cache_item(tu: string): JsonNode =
   %*{"type": "track", "url": tu}
 
-iterator items*(items_collector: var ItemsCollector[BandcampUrl]): Item =
-  let page =
+func `/`(a: BandcampUrl, b: string): string =
+  a.string.strip(leading = false, chars = {'/'}) & '/' &
+    b.strip(trailing = false, chars = {'/'})
+
+proc not_cached_albums_urls(items_collector: ItemsCollector[BandcampUrl]): seq[string] =
+  let artist_page =
     "yt-dlp"
-    .execute(
+    .execute_immediately(
       @[
-        "--flat-playlist", "--skip-download", "--dump-pages", items_collector.url.string
+        "--flat-playlist",
+        "--skip-download",
+        "--dump-pages",
+        $(items_collector.url.string.parse_uri / "music"),
       ]
     ).split_lines
     .filter((l: string) => is_some l.match re"[^\[].*")[0].decode
 
-  let albums_urls = block:
-    var r: OrderedSet[string]
-    for reg in [
-      re("href=\"([^&\\n]+)&amp;tab=music"),
-      re("\"(\\/(?:album|track)\\/[^\"]+)\""),
-      re(";(\\/(?:album|track)\\/[^&\"]+)(?:&|\")"),
-      re"page_url&quot;:&quot;([^&]+)&",
-    ]:
-      for m in page.find_iter reg:
-        let c = m.captures[0]
-        let au = block:
-          if c.starts_with "http":
-            c
-          else:
-            $items_collector.url.string.parse_uri / c
-        if au.album_cache_item notin items_collector.cache:
-          r.incl au
-    var r_seq = r.to_seq
-    reverse r_seq
-    r_seq
+  var r: OrderedSet[string]
+  for reg in [
+    re("href=\"([^&\\n]+)&amp;tab=music"),
+    re("\"(\\/(?:album|track)\\/[^\"]+)\""),
+    re(";(\\/(?:album|track)\\/[^&\"]+)(?:&|\")"),
+    re"page_url&quot;:&quot;([^&]+)&",
+  ]:
+    for m in artist_page.find_iter reg:
+      let c = m.captures[0]
+      let au = block:
+        if c.starts_with "http":
+          c
+        else:
+          $(items_collector.url.string.parse_uri / c)
+      if au.album_cache_item notin items_collector.cache:
+        r.incl au
+  result = r.to_seq
+  reverse result
 
-  for au in albums_urls:
-    let tracks_urls_output_lines = block:
-      try:
-        split_lines "yt-dlp".execute @[
-          "--flat-playlist", "--print", "url", items_collector.url.string
-        ]
-      except CommandFatalError:
-        continue
+proc cache_until_including*(
+    items_collector: var ItemsCollector[BandcampUrl], last_album_url: string
+) =
+  for au in items_collector.not_cached_albums_urls:
+    items_collector.cache.incl au.album_cache_item
+    if au.split('/')[^1] == last_album_url.split('/')[^1]:
+      break
 
-    let tracks_urls =
-      tracks_urls_output_lines.filter (l: string) => l.starts_with "http"
+iterator items*(items_collector: var ItemsCollector[BandcampUrl]): Item =
+  for au in items_collector.not_cached_albums_urls:
+    let single = "/track/" in au
+    let tracks_urls = block:
+      if single:
+        @[au]
+      else:
+        let tracks_urls_output_lines = block:
+          try:
+            split_lines "yt-dlp".execute @["--flat-playlist", "--print", "url", au]
+          except CommandFatalError:
+            continue
+        tracks_urls_output_lines.filter (l: string) => l.starts_with "http"
 
     for i, tu in enumerate tracks_urls:
       if tu.track_cache_item in items_collector.cache:
         continue
-      let tracks_info_output_lines = split_lines "yt-dlp".execute @[
+      let track_info_output_lines = split_lines "yt-dlp".execute @[
         "--skip-download", "--print", "uploader", "--print", "title", "--print",
-        "duration",
+        "duration", tu,
       ]
 
-      var i = 0
-      while i + 2 < tracks_info_output_lines.len:
-        let decoupled = decouple_performer_and_title(
-          tracks_info_output_lines[i], tracks_info_output_lines[i + 1]
-        )
-        yield Item(
-          url: tu,
-          performer: decoupled.performer,
-          title: decoupled.title,
-          duration: int parse_float tracks_info_output_lines[i + 2],
-          cache_items:
-            if i == tracks_urls.len - 1:
-              @[tu.track_cache_item, au.album_cache_item]
-            else:
-              @[tu.track_cache_item],
-        )
+      let decoupled = decouple_performer_and_title(
+        track_info_output_lines[0], track_info_output_lines[1]
+      )
+      yield Item(
+        url: tu,
+        performer: decoupled.performer,
+        title: decoupled.title,
+        duration: int parse_float track_info_output_lines[2],
+        cache_items:
+          if (i == tracks_urls.len - 1) and not single:
+            @[tu.track_cache_item, au.album_cache_item]
+          else:
+            @[tu.track_cache_item],
+        thumbnail_id: ($au.hash).strip(trailing = false, chars = {'-'}),
+      )
 
 proc on_uploaded*(
     items_collector: var ItemsCollector[BandcampUrl],
@@ -109,3 +119,5 @@ proc on_uploaded*(
 ) =
   for c in item.cache_items:
     items_collector.cache.incl c
+  if downloaded.is_some and item.cache_items.len == 2:
+    downloaded.get.thumbnail_path.remove_file

@@ -23,8 +23,8 @@ type CommandProcess = object
   args: seq[string]
   process: Process
 
-func command_string(p: CommandProcess): string =
-  p.command & " " & p.args.map(quote_shell).join(" ")
+func command_string(command: string, args: seq[string]): string =
+  command & " " & args.map(quote_shell).join(" ")
 
 proc new_command_process*(command: string, args: seq[string]): CommandProcess =
   result = CommandProcess(
@@ -37,21 +37,22 @@ proc new_command_process*(command: string, args: seq[string]): CommandProcess =
       env = new_string_table({"http_proxy": ytdlp_proxy, "https_proxy": ytdlp_proxy}),
     ),
   )
-  log(lvl_debug, result.command_string)
+  lvl_debug.log command_string(result.command, result.args)
+
+proc process_substring_exceptions(output: string) =
+  for s in recoverable_error_output_substring:
+    if s in output:
+      log(lvl_warn, &"command failed:\n{output}")
+      raise new_exception(CommandRecoverableError, output)
+  for s in fatal_error_output_substrings:
+    if s in output:
+      log(lvl_warn, &"command failed:\n{output}")
+      raise new_exception(CommandFatalError, output)
 
 proc wait_for_exit*(p: CommandProcess): string =
   discard p.process.wait_for_exit
-  let stdout = p.process.output_stream.read_all
-  let stderr = p.process.error_stream.read_all
-  for s in recoverable_error_output_substring:
-    if s in stderr:
-      log(lvl_warn, &"command '{p.command_string}' failed:\n{stderr}")
-      raise new_exception(CommandRecoverableError, stderr)
-  for s in fatal_error_output_substrings:
-    if s in stderr:
-      log(lvl_warn, &"command '{p.command_string}' failed:\n{stderr}")
-      raise new_exception(CommandFatalError, stderr)
-  return stdout
+  process_substring_exceptions(p.process.error_stream.read_all)
+  return p.process.output_stream.read_all
 
 proc execute*(command: string, args: seq[string]): string =
   while true:
@@ -59,3 +60,8 @@ proc execute*(command: string, args: seq[string]): string =
       return wait_for_exit command.new_command_process args
     except CommandRecoverableError:
       continue
+
+proc execute_immediately*(command: string, args: seq[string]): string =
+  lvl_debug.log command_string(command, args)
+  result = exec_process(command, args = args, options = {po_use_path})
+  process_substring_exceptions result

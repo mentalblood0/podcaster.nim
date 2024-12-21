@@ -8,6 +8,7 @@ import logging
 import commands
 
 import youtube
+import bandcamp
 
 type Task = object
   chat_id: string
@@ -25,23 +26,22 @@ type Config = object
   podcaster: Podcaster
   tasks: seq[Task]
 
-proc process_task(podcaster: Podcaster, task: Task) =
-  var collector = new_items_collector task.url.YoutubeUrl
+template process_task(podcaster: typed, task: typed, T: untyped) =
+  lvl_debug.log "process task " & $task
+  var collector = new_items_collector task.url.T
 
-  var skip = task.start_after_url.is_some
+  if task.start_after_url.is_some:
+    collector.cache_until_including task.start_after_url.get
+
   for item in collector:
-    if skip:
-      if task.start_after_url.get == item.url:
-        skip = false
-      collector.on_uploaded item
-      continue
-    lvl_info.log &"process item {item}"
+    lvl_debug.log "process item " & $item
 
     var downloaded: Downloaded
     try:
       downloaded = Downloaded(
-        audio_path: podcaster.downloader.download_audio(item.url, item.name),
-        thumbnail_path: podcaster.downloader.download_thumbnail(item.url, item.name),
+        audio_path: podcaster.downloader.download_audio item.url,
+        thumbnail_path:
+          podcaster.downloader.download_thumbnail(item.url, item.thumbnail_id),
       )
     except CommandFatalError:
       collector.on_uploaded item
@@ -68,7 +68,17 @@ when is_main_module:
 
   for t in config.tasks:
     try:
-      config.podcaster.process_task t
+      try:
+        config.podcaster.process_task(t, BandcampUrl)
+        continue
+      except UnsupportedUrlError:
+        discard
+      try:
+        config.podcaster.process_task(t, YoutubeUrl)
+        continue
+      except UnsupportedUrlError:
+        discard
+      raise new_exception(UnsupportedUrlError, &"No module support URL '{t.url}'")
     except:
       remove_temp_files()
       raise
