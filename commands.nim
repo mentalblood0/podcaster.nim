@@ -10,6 +10,7 @@ var recoverable_error_output_substring* =
   @[
     "SSL: UNEXPECTED_EOF_WHILE_READING", "Unable to connect to proxy",
     "Read timed out.", "Unable to fetch PO Token for mweb client", "IncompleteRead",
+    "Remote end closed connection without response",
   ]
 
 var fatal_error_output_substrings* =
