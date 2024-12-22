@@ -1,1 +1,1 @@
-nim c -d:ssl podcaster.nim && mv podcaster ~/
+nim c -d:ssl -d:release podcaster.nim && mv podcaster ~/.local/bin/
