@@ -3,7 +3,7 @@
 # by the University of Cambridge, England. Source can be found at
 # ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/
 
-import std/[options, logging, json, paths, cmdline, strutils, strformat, nre, os]
+import std/[options, logging, json, cmdline, strutils, strformat, nre, os]
 
 import downloader
 import uploader
@@ -74,7 +74,7 @@ proc process_task[T](podcaster: Podcaster, task: ClassifiedTask[T]) =
 
 when is_main_module:
   let config =
-    (parse_json read_file get_config_dir().string / "podcaster" / param_str 1).to Config
+    (parse_json read_file get_config_dir() / "podcaster" / param_str 1).to Config
 
   ytdlp_proxy = config.ytdlp_proxy
   temp_files_dir = config.temp_files_dir

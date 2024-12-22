@@ -3,7 +3,7 @@
 # by the University of Cambridge, England. Source can be found at
 # ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/
 
-import std/[strformat, json, math, nre, strutils, sets, hashes, options, logging, os]
+import std/[strformat, json, math, nre, strutils, sets, hashes, options, logging]
 
 import common
 import cache

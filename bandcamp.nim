@@ -5,7 +5,7 @@
 
 import
   std/[
-    strformat, json, math, nre, strutils, sets, hashes, options, os, sugar, sequtils,
+    strformat, json, math, nre, strutils, sets, hashes, options, sugar, sequtils,
     base64, uri, algorithm, enumerate, logging,
   ]
 
