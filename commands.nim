@@ -50,9 +50,15 @@ proc process_substring_exceptions(output: string) =
       raise new_exception(CommandFatalError, output)
 
 proc wait_for_exit*(p: CommandProcess): string =
-  discard p.process.wait_for_exit
-  process_substring_exceptions(p.process.error_stream.read_all)
-  return p.process.output_stream.read_all
+  let exit_code = p.process.wait_for_exit
+  let stdout = p.process.output_stream.read_all
+  let stderr = p.process.error_stream.read_all
+  p.process.close()
+  process_substring_exceptions(stderr)
+  if exit_code != 0:
+    log(lvl_warn, &"command failed:\n{stderr}")
+    do_assert exit_code == 0
+  return stdout
 
 proc execute*(command: string, args: seq[string]): string =
   while true:

@@ -30,10 +30,6 @@ func album_cache_item(au: string): JsonNode =
 func track_cache_item(tu: string): JsonNode =
   %*{"type": "track", "url": tu}
 
-func `/`(a: BandcampUrl, b: string): string =
-  a.string.strip(leading = false, chars = {'/'}) & '/' &
-    b.strip(trailing = false, chars = {'/'})
-
 proc not_cached_albums_urls(items_collector: ItemsCollector[BandcampUrl]): seq[string] =
   let artist_page =
     "yt-dlp"
