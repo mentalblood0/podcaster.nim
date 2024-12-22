@@ -38,6 +38,16 @@ proc new_items_collector*[T](u: T): ItemsCollector[T] =
   result.url = u
   result.cache = new_cache (u.string.match url_regex u).get.captures[0]
 
+proc on_uploaded*[T](
+    items_collector: var ItemsCollector[T],
+    item: Item,
+    downloaded: Option[Downloaded] = none(Downloaded),
+) =
+  for c in item.cache_items:
+    items_collector.cache.incl c
+  if downloaded.is_some and not item.keep_thumbnail:
+    downloaded.get.thumbnail_path.remove_file
+
 proc process_task[T](podcaster: Podcaster, task: ClassifiedTask[T]) =
   var collector = new_items_collector task.source.url.T
   lvl_debug.log "process task " & $task

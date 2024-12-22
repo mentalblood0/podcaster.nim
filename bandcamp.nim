@@ -103,14 +103,5 @@ iterator items*(items_collector: var ItemsCollector[BandcampUrl]): Item =
           else:
             @[tu.track_cache_item],
         thumbnail_id: thumbnail_id,
+        keep_thumbnail: i != tracks_urls.len - 1,
       )
-
-proc on_uploaded*(
-    items_collector: var ItemsCollector[BandcampUrl],
-    item: Item,
-    downloaded: Option[Downloaded] = none(Downloaded),
-) =
-  for c in item.cache_items:
-    items_collector.cache.incl c
-  if downloaded.is_some and item.cache_items.len == 2:
-    downloaded.get.thumbnail_path.remove_file

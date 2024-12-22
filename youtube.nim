@@ -67,14 +67,5 @@ iterator items*(items_collector: var ItemsCollector[YoutubeUrl]): Item =
         duration: ii.duration,
         cache_items: @[ii.cache_item],
         thumbnail_id: ($ii.hash).strip(trailing = false, chars = {'-'}),
+        keep_thumbnail: false,
       )
-
-proc on_uploaded*(
-    items_collector: var ItemsCollector[YoutubeUrl],
-    item: Item,
-    downloaded: Option[Downloaded] = none(Downloaded),
-) =
-  for c in item.cache_items:
-    items_collector.cache.incl c
-  if downloaded.is_some:
-    downloaded.get.thumbnail_path.remove_file

@@ -10,6 +10,7 @@ type
     duration*: int
     cache_items*: seq[JsonNode]
     thumbnail_id*: string
+    keep_thumbnail*: bool
 
   ItemsCollector*[T] = object
     url*: T
