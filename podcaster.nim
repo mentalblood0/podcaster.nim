@@ -1,10 +1,16 @@
-import std/[options, logging, json, appdirs, paths, cmdline, strutils, strformat]
+# Regular expression support is provided by the PCRE library package,
+# which is open source software, written by Philip Hazel, and copyright
+# by the University of Cambridge, England. Source can be found at
+# ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/
+
+import std/[options, logging, json, appdirs, paths, cmdline, strutils, strformat, nre]
 
 import downloader
 import uploader
 import common
 import tempfiles
 import commands
+import cache
 
 import youtube
 import bandcamp
@@ -25,12 +31,25 @@ type Config = object
   podcaster: Podcaster
   tasks: seq[Task]
 
-template process_task(podcaster: typed, task: typed, T: untyped) =
-  var collector = new_items_collector task.url.T
+type ClassifiedTask[T] = object
+  source: Task
+
+proc url_regex[T](url: T): Regex =
+  if typeof(url) is BandcampUrl:
+    return bandcamp_url_regex
+  elif typeof(url) is YoutubeUrl:
+    return youtube_url_regex
+
+proc new_items_collector*[T](u: T): ItemsCollector[T] =
+  result.url = u
+  result.cache = new_cache (u.string.match url_regex u).get.captures[0]
+
+proc process_task[T](podcaster: Podcaster, task: ClassifiedTask[T]) =
+  var collector = new_items_collector task.source.url.T
   lvl_debug.log "process task " & $task
 
-  if task.start_after_url.is_some:
-    collector.cache_until_including task.start_after_url.get
+  if task.source.start_after_url.is_some:
+    collector.cache_until_including task.source.start_after_url.get
 
   for item in collector:
     lvl_debug.log "process item " & $item
@@ -46,7 +65,7 @@ template process_task(podcaster: typed, task: typed, T: untyped) =
       collector.on_uploaded item
       continue
 
-    podcaster.uploader.upload(item, downloaded, task.chat_id)
+    podcaster.uploader.upload(item, downloaded, task.source.chat_id)
     collector.on_uploaded(item, some(downloaded))
 
 when is_main_module:
@@ -68,17 +87,12 @@ when is_main_module:
 
   for t in config.tasks:
     try:
-      try:
-        config.podcaster.process_task(t, BandcampUrl)
-        continue
-      except UnsupportedUrlError:
-        discard
-      try:
-        config.podcaster.process_task(t, YoutubeUrl)
-        continue
-      except UnsupportedUrlError:
-        discard
-      raise new_exception(UnsupportedUrlError, &"No module support URL '{t.url}'")
+      if is_some t.url.match bandcamp_url_regex:
+        config.podcaster.process_task ClassifiedTask[BandcampUrl](source: t)
+      elif is_some t.url.match youtube_url_regex:
+        config.podcaster.process_task ClassifiedTask[YoutubeUrl](source: t)
+      else:
+        raise new_exception(UnsupportedUrlError, &"No module support url '{t.url}'")
     except:
       remove_temp_files()
       raise

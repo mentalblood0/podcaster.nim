@@ -14,18 +14,10 @@ type
 
   YoutubeUrl* = distinct string
 
+let youtube_url_regex* = re"https?:\/\/((?:\w|-)+)\.bandcamp\.com\/?$"
+
 func cache_item(ii: IntermediateItem): JsonNode =
   %*{"title": ii.title, "duration": ii.duration}
-
-proc new_items_collector*(playlist_url: YoutubeUrl): ItemsCollector[YoutubeUrl] =
-  let m = playlist_url.string.match re"https?:\/\/(?:www\.)?youtube\.com\/@?((?:\w|\.)+)\/(?:(?:videos)|(?:playlist\?list=(?:\w|-)+))\/?$"
-  if not is_some m:
-    raise new_exception(
-      UnsupportedUrlError,
-      &"Youtube module does not support URL '{playlist_url.string}'",
-    )
-  result.url = playlist_url
-  result.cache = new_cache m.get.captures[0]
 
 proc get_intermediate_items(
     items_collector: ItemsCollector[YoutubeUrl]

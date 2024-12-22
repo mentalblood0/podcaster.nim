@@ -15,14 +15,7 @@ import commands
 
 type BandcampUrl* = distinct string
 
-proc new_items_collector*(artist_url: BandcampUrl): ItemsCollector[BandcampUrl] =
-  let m = artist_url.string.match re"https?:\/\/((?:\w|-)+)\.bandcamp\.com\/?$"
-  if not is_some m:
-    raise new_exception(
-      UnsupportedUrlError, &"Bandcamp module does not support URL '{artist_url.string}'"
-    )
-  result.url = artist_url
-  result.cache = new_cache m.get.captures[0]
+let bandcamp_url_regex* = re"https?:\/\/((?:\w|-)+)\.bandcamp\.com\/?$"
 
 func album_cache_item(au: string): JsonNode =
   %*{"type": "album", "url": au}
