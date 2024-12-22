@@ -83,7 +83,7 @@ when is_main_module:
     try:
       if is_some t.url.match t.url.BandcampUrl.url_regex:
         config.podcaster.process_task ClassifiedTask[BandcampUrl](source: t)
-      if is_some t.url.match t.url.YoutubeUrl.url_regex:
+      elif is_some t.url.match t.url.YoutubeUrl.url_regex:
         config.podcaster.process_task ClassifiedTask[YoutubeUrl](source: t)
       else:
         raise new_exception(UnsupportedUrlError, &"No module support url '{t.url}'")
