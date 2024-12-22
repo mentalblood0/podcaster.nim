@@ -70,6 +70,11 @@ proc execute*(command: string, args: seq[string]): string =
       continue
 
 proc execute_immediately*(command: string, args: seq[string]): string =
-  lvl_debug.log command_string(command, args)
-  result = exec_process(command, args = args, options = {po_use_path})
-  process_substring_exceptions result
+  while true:
+    lvl_debug.log command_string(command, args)
+    result = exec_process(command, args = args, options = {po_use_path})
+    try:
+      process_substring_exceptions result
+      break
+    except CommandRecoverableError:
+      continue
