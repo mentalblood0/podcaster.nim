@@ -14,7 +14,8 @@ type
 
   YoutubeUrl* = distinct string
 
-let youtube_url_regex* = re"https?:\/\/((?:\w|-)+)\.bandcamp\.com\/?$"
+proc url_regex*(url: YoutubeUrl): Regex =
+  return re"https?:\/\/((?:\w|-)+)\.bandcamp\.com\/?$"
 
 func cache_item(ii: IntermediateItem): JsonNode =
   %*{"title": ii.title, "duration": ii.duration}

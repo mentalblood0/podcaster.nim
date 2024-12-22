@@ -34,12 +34,6 @@ type Config = object
 type ClassifiedTask[T] = object
   source: Task
 
-proc url_regex[T](url: T): Regex =
-  if typeof(url) is BandcampUrl:
-    return bandcamp_url_regex
-  elif typeof(url) is YoutubeUrl:
-    return youtube_url_regex
-
 proc new_items_collector*[T](u: T): ItemsCollector[T] =
   result.url = u
   result.cache = new_cache (u.string.match url_regex u).get.captures[0]
@@ -87,9 +81,9 @@ when is_main_module:
 
   for t in config.tasks:
     try:
-      if is_some t.url.match bandcamp_url_regex:
+      if is_some t.url.match t.url.BandcampUrl.url_regex:
         config.podcaster.process_task ClassifiedTask[BandcampUrl](source: t)
-      elif is_some t.url.match youtube_url_regex:
+      if is_some t.url.match t.url.YoutubeUrl.url_regex:
         config.podcaster.process_task ClassifiedTask[YoutubeUrl](source: t)
       else:
         raise new_exception(UnsupportedUrlError, &"No module support url '{t.url}'")

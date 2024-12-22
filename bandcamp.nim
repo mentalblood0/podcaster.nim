@@ -15,7 +15,8 @@ import commands
 
 type BandcampUrl* = distinct string
 
-let bandcamp_url_regex* = re"https?:\/\/((?:\w|-)+)\.bandcamp\.com\/?$"
+proc url_regex*(url: BandcampUrl): Regex =
+  return re"https?:\/\/((?:\w|-)+)\.bandcamp\.com\/?$"
 
 func album_cache_item(au: string): JsonNode =
   %*{"type": "album", "url": au}
