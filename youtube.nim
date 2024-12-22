@@ -8,7 +8,6 @@ import std/[strformat, json, math, nre, strutils, sets, hashes, options, logging
 import common
 import cache
 import commands
-import logging
 
 type
   IntermediateItem = tuple[url: string, title: string, duration: int]

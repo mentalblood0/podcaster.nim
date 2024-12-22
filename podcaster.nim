@@ -4,7 +4,6 @@ import downloader
 import uploader
 import common
 import tempfiles
-import logging
 import commands
 
 import youtube
@@ -58,6 +57,7 @@ when is_main_module:
   ytdlp_proxy = config.ytdlp_proxy
   temp_files_dir = config.temp_files_dir
 
+  add_handler new_console_logger(fmt_str = "$date $time $levelname ")
   case config.log_level
   of "debug":
     set_log_filter lvl_debug

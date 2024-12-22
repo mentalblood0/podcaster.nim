@@ -42,11 +42,11 @@ proc new_command_process*(command: string, args: seq[string]): CommandProcess =
 proc process_substring_exceptions(output: string) =
   for s in recoverable_error_output_substring:
     if s in output:
-      log(lvl_warn, &"command failed:\n{output}")
+      lvl_warn.log &"command failed:\n{output}"
       raise new_exception(CommandRecoverableError, output)
   for s in fatal_error_output_substrings:
     if s in output:
-      log(lvl_warn, &"command failed:\n{output}")
+      lvl_warn.log &"command failed:\n{output}"
       raise new_exception(CommandFatalError, output)
 
 proc wait_for_exit*(p: CommandProcess): string =
@@ -56,8 +56,9 @@ proc wait_for_exit*(p: CommandProcess): string =
   p.process.close()
   process_substring_exceptions(stderr)
   if exit_code != 0:
-    log(lvl_warn, &"command failed:\n{stderr}")
-    do_assert exit_code == 0
+    let error_text = &"command failed:\n{stderr}"
+    lvl_warn.log error_text
+    raise new_exception(AssertionDefect, error_text)
   return stdout
 
 proc execute*(command: string, args: seq[string]): string =

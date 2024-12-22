@@ -90,7 +90,7 @@ proc upload*(uploader: Uploader, item: Item, downloaded: Downloaded, chat_id: st
         )
         break
       except:
-        raise
+        lvl_warn.log &"exception during sending request to telegram: {get_current_exception().msg}"
         continue
     if not response.status.starts_with "200":
       lvl_warn.log &"response is {response.status} {response.body}"
