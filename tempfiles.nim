@@ -7,6 +7,10 @@ proc new_temp_file*(name: string): string =
   result = string temp_files_dir.Path / name.Path
   temp_files.incl result
 
+proc remove_temp_file*(path: string) =
+  temp_files.excl path
+  path.remove_file
+
 proc remove_temp_files*() =
   for p in temp_files:
     p.remove_file

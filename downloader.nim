@@ -40,7 +40,7 @@ proc download_audio*(downloader: Downloader, url: string): string =
       &"{downloader.conversion_params.get.bitrate}k",
       converted_path,
     ]
-    original_path.remove_file
+    original_path.remove_temp_file
     return converted_path
   else:
     return original_path
@@ -66,6 +66,6 @@ proc download_thumbnail*(downloader: Downloader, url: string, id: string): strin
     &"scale={downloader.thumbnail_scale_width}:-1",
     scaled_path,
   ]
-  original_path.remove_file
-  converted_path.remove_file
+  original_path.remove_temp_file
+  converted_path.remove_temp_file
   scaled_path

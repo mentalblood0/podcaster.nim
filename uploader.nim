@@ -46,7 +46,7 @@ iterator split(
     discard p.process.wait_for_exit
     assert p.path.get_file_size <= max_uploaded_audio_size
     yield (path: p.path, duration: part_duration)
-  audio_path.remove_file
+  audio_path.remove_temp_file
 
 proc upload*(uploader: Uploader, item: Item, downloaded: Downloaded, chat_id: string) =
   if downloaded.audio_path.get_file_size >= max_uploaded_audio_size:
@@ -98,4 +98,4 @@ proc upload*(uploader: Uploader, item: Item, downloaded: Downloaded, chat_id: st
         sleep(1000)
       continue
     break
-  downloaded.audio_path.remove_file
+  downloaded.audio_path.remove_temp_file
