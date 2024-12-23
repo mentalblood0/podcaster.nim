@@ -27,7 +27,7 @@ func track_cache_item(tu: string): JsonNode =
 proc not_cached_albums_urls(items_collector: ItemsCollector[BandcampUrl]): seq[string] =
   let artist_page =
     "yt-dlp"
-    .execute_immediately(
+    .execute(
       @[
         "--flat-playlist",
         "--skip-download",

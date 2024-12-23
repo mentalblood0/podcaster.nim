@@ -51,13 +51,14 @@ proc process_substring_exceptions(output: string) =
       raise new_exception(CommandFatalError, output)
 
 proc wait_for_exit*(p: CommandProcess): string =
-  let exit_code = p.process.wait_for_exit
+  p.process.input_stream.close()
   let stdout = p.process.output_stream.read_all
   let stderr = p.process.error_stream.read_all
+  let exit_code = p.process.wait_for_exit
   p.process.close()
-  process_substring_exceptions(stderr)
+  process_substring_exceptions stderr
   if exit_code != 0:
-    let error_text = &"command failed:\n{stderr}"
+    let error_text = &"command failed with exit code {exit_code}:\n{stderr}"
     lvl_warn.log error_text
     raise new_exception(AssertionDefect, error_text)
   return stdout
@@ -66,15 +67,5 @@ proc execute*(command: string, args: seq[string]): string =
   while true:
     try:
       return wait_for_exit command.new_command_process args
-    except CommandRecoverableError:
-      continue
-
-proc execute_immediately*(command: string, args: seq[string]): string =
-  while true:
-    lvl_debug.log command_string(command, args)
-    result = exec_process(command, args = args, options = {po_use_path})
-    try:
-      process_substring_exceptions result
-      break
     except CommandRecoverableError:
       continue

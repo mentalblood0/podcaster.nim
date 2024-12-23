@@ -37,7 +37,7 @@ proc download_audio*(downloader: Downloader, url: string): string =
       "-ac",
       $downloader.conversion_params.get.channels,
       "-b:a",
-      $downloader.conversion_params.get.bitrate,
+      &"{downloader.conversion_params.get.bitrate}k",
       converted_path,
     ]
     original_path.remove_file
