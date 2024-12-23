@@ -5,8 +5,8 @@
 
 import
   std/[
-    strformat, json, math, nre, strutils, sets, hashes, options, sugar, sequtils,
-    base64, uri, algorithm, enumerate, logging,
+    json, math, nre, strutils, sets, hashes, options, sugar, sequtils, base64, uri,
+    algorithm, enumerate,
   ]
 
 import common
@@ -90,8 +90,6 @@ iterator items*(items_collector: var ItemsCollector[BandcampUrl]): Item =
       let decoupled = decouple_performer_and_title(
         performer = track_info_output_lines[0], title = track_info_output_lines[1]
       )
-      lvl_debug.log &"got: '{track_info_output_lines[0]}', '{track_info_output_lines[1]}'"
-      lvl_debug.log &"decouple: '{decoupled.performer}', '{decoupled.title}'"
       yield Item(
         url: tu,
         performer: decoupled.performer,

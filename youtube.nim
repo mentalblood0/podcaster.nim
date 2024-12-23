@@ -3,7 +3,7 @@
 # by the University of Cambridge, England. Source can be found at
 # ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/
 
-import std/[strformat, json, math, nre, strutils, sets, hashes, options, logging]
+import std/[json, math, nre, strutils, sets, hashes, options]
 
 import common
 import cache
@@ -57,7 +57,6 @@ iterator items*(items_collector: var ItemsCollector[YoutubeUrl]): Item =
       "--skip-download", "--playlist-items", "1", "--print", "playlist_uploader",
       items_collector.url.string,
     ]
-    lvl_info.log &"{performer} items not in cache: {intermediate_items.len}"
     for ii in intermediate_items:
       let decoupled = decouple_performer_and_title(performer, ii.title)
       yield Item(

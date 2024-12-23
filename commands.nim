@@ -24,8 +24,8 @@ type CommandProcess = object
   args: seq[string]
   process: Process
 
-func command_string(command: string, args: seq[string]): string =
-  command & " " & args.map(quote_shell).join(" ")
+func command_string(cp: CommandProcess): string =
+  cp.command & " " & cp.args.map(quote_shell).join(" ")
 
 proc new_command_process*(command: string, args: seq[string]): CommandProcess =
   result = CommandProcess(
@@ -38,30 +38,27 @@ proc new_command_process*(command: string, args: seq[string]): CommandProcess =
       env = new_string_table({"http_proxy": ytdlp_proxy, "https_proxy": ytdlp_proxy}),
     ),
   )
-  lvl_debug.log command_string(result.command, result.args)
-
-proc process_substring_exceptions(output: string) =
-  for s in recoverable_error_output_substring:
-    if s in output:
-      lvl_warn.log &"command failed:\n{output}"
-      raise new_exception(CommandRecoverableError, output)
-  for s in fatal_error_output_substrings:
-    if s in output:
-      lvl_warn.log &"command failed:\n{output}"
-      raise new_exception(CommandFatalError, output)
+  lvl_debug.log command_string result
 
 proc wait_for_exit*(p: CommandProcess): string =
   p.process.input_stream.close()
-  let stdout = p.process.output_stream.read_all
+  result = p.process.output_stream.read_all
   let stderr = p.process.error_stream.read_all
   let exit_code = p.process.wait_for_exit
   p.process.close()
-  process_substring_exceptions stderr
+  let error_message =
+    &"command {p.command_string} failed with exit code {exit_code}:\n{stderr}"
+  for s in recoverable_error_output_substring:
+    if s in stderr:
+      lvl_warn.log error_message
+      raise new_exception(CommandRecoverableError, "see last warning")
+  for s in fatal_error_output_substrings:
+    if s in stderr:
+      lvl_warn.log error_message
+      raise new_exception(CommandFatalError, "see last warning")
   if exit_code != 0:
-    let error_text = &"command failed with exit code {exit_code}:\n{stderr}"
-    lvl_warn.log error_text
-    raise new_exception(AssertionDefect, error_text)
-  return stdout
+    lvl_warn.log error_message
+    raise new_exception(AssertionDefect, "see last warning")
 
 proc execute*(command: string, args: seq[string]): string =
   while true:
