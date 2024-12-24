@@ -33,6 +33,8 @@ proc not_cached_albums_urls(items_collector: ItemsCollector[BandcampUrl]): seq[s
         "--skip-download",
         "--dump-pages",
         $(items_collector.url.string.parse_uri / "music"),
+        "--proxy",
+        "",
       ]
     ).split_lines
     .filter((l: string) => is_some l.match re"[^\[].*")[0].decode
@@ -74,7 +76,9 @@ iterator items*(items_collector: var ItemsCollector[BandcampUrl]): Item =
       else:
         let tracks_urls_output_lines = block:
           try:
-            split_lines "yt-dlp".execute @["--flat-playlist", "--print", "url", au]
+            split_lines "yt-dlp".execute @[
+              "--flat-playlist", "--print", "url", "--proxy", "", au
+            ]
           except CommandFatalError:
             continue
         tracks_urls_output_lines.filter (l: string) => l.starts_with "http"
@@ -84,7 +88,7 @@ iterator items*(items_collector: var ItemsCollector[BandcampUrl]): Item =
         continue
       let track_info_output_lines = split_lines "yt-dlp".execute @[
         "--skip-download", "--print", "uploader", "--print", "title", "--print",
-        "duration", tu,
+        "duration", "--proxy", "", tu,
       ]
 
       let decoupled = decouple_performer_and_title(

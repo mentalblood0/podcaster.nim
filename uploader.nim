@@ -1,7 +1,7 @@
 import
   std/[
     uri, os, enumerate, httpclient, logging, strformat, options, strutils, paths, math,
-    sugar,
+    sugar, net,
   ]
 
 import common
@@ -10,7 +10,7 @@ import commands
 
 const max_uploaded_audio_size = 1024 * 1024 * 48
 
-var default_http_client* = new_http_client()
+var default_http_client* = new_http_client(timeout = 60000)
 
 type Uploader* = object
   token: string
@@ -77,7 +77,7 @@ proc upload*(uploader: Uploader, item: Item, downloaded: Downloaded, chat_id: st
       &"{item.performer.get} - {item.title}"
     else:
       item.title
-  log(lvl_info, &"--> {log_string}")
+  lvl_info.log &"--> {log_string}"
 
   while true:
     var response: Response
@@ -89,13 +89,19 @@ proc upload*(uploader: Uploader, item: Item, downloaded: Downloaded, chat_id: st
           multipart = multipart,
         )
         break
+      except TimeoutError:
+        lvl_warn.log &"TimeoutError when uploading to telegram"
+        default_http_client.close()
+        default_http_client = new_http_client(timeout = 60000)
+        continue
       except:
         lvl_warn.log &"exception during sending request to telegram: {get_current_exception().msg}"
         continue
     if not response.status.starts_with "200":
-      lvl_warn.log &"response is {response.status} {response.body}"
+      lvl_warn.warn &"response is {response.status} {response.body}"
       if response.status.starts_with "429":
         sleep(1000)
       continue
     break
   downloaded.audio_path.remove_temp_file
+  lvl_debug.log &"--> uploaded {log_string}"
