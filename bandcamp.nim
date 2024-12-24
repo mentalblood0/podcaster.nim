@@ -106,4 +106,5 @@ iterator items*(items_collector: var ItemsCollector[BandcampUrl]): Item =
             @[tu.track_cache_item],
         thumbnail_id: thumbnail_id,
         keep_thumbnail: i != tracks_urls.len - 1,
+        need_proxy: false,
       )

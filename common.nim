@@ -11,6 +11,7 @@ type
     cache_items*: seq[JsonNode]
     thumbnail_id*: string
     keep_thumbnail*: bool
+    need_proxy*: bool
 
   ItemsCollector*[T] = object
     url*: T

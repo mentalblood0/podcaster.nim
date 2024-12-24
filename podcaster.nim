@@ -61,7 +61,7 @@ proc process_task[T](podcaster: Podcaster, task: ClassifiedTask[T]) =
     var downloaded: Downloaded
     try:
       downloaded = Downloaded(
-        audio_path: podcaster.downloader.download_audio item.url,
+        audio_path: podcaster.downloader.download_audio(item.url, item.need_proxy),
         thumbnail_path:
           podcaster.downloader.download_thumbnail(item.url, item.thumbnail_id),
       )

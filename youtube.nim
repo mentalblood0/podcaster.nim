@@ -67,4 +67,5 @@ iterator items*(items_collector: var ItemsCollector[YoutubeUrl]): Item =
         cache_items: @[ii.cache_item],
         thumbnail_id: ($ii.hash).strip(trailing = false, chars = {'-'}),
         keep_thumbnail: false,
+        need_proxy: true,
       )

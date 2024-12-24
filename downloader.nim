@@ -13,7 +13,7 @@ type Downloader* = object
   conversion_params*: Option[ConversionParams]
   thumbnail_scale_width*: int
 
-proc download_audio*(downloader: Downloader, url: string): string =
+proc download_audio*(downloader: Downloader, url: string, use_proxy: bool): string =
   let id = ($url.hash).strip(trailing = false, chars = {'-'})
   let original_path = id.new_temp_file
   discard new_temp_file string id.Path.add_file_ext "part"
@@ -24,7 +24,10 @@ proc download_audio*(downloader: Downloader, url: string): string =
       else:
         "mp3"
     lvl_info.log &"<-- {url}"
-    discard "yt-dlp".execute @["-f", format, "-o", original_path, url]
+    var args = @["-f", format, "-o", original_path]
+    if not use_proxy:
+      args &= @["--proxy", ""]
+    discard "yt-dlp".execute args & @[url]
 
   if is_some downloader.conversion_params:
     let converted_path = (&"{id}.mp3").new_temp_file
