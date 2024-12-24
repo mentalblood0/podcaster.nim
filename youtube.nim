@@ -53,10 +53,14 @@ iterator items*(items_collector: var ItemsCollector[YoutubeUrl]): Item =
   let intermediate_items = items_collector.get_intermediate_items()
 
   if intermediate_items.len > 0:
-    let performer = strip "yt-dlp".execute @[
-      "--skip-download", "--playlist-items", "1", "--print", "playlist_uploader",
-      items_collector.url.string,
-    ]
+    let performer =
+      if items_collector.performer_from_title:
+        ""
+      else:
+        strip "yt-dlp".execute @[
+          "--skip-download", "--playlist-items", "1", "--print", "playlist_uploader",
+          items_collector.url.string,
+        ]
     for ii in intermediate_items:
       let decoupled = decouple_performer_and_title(performer, ii.title)
       yield Item(

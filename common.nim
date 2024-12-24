@@ -16,6 +16,7 @@ type
   ItemsCollector*[T] = object
     url*: T
     cache*: Cache
+    performer_from_title*: bool
 
   Downloaded* = object
     audio_path*: string

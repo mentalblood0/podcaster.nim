@@ -19,6 +19,7 @@ type Task = object
   chat_id: string
   url: string
   start_after_url: Option[string]
+  performer_from_title: Option[bool]
 
 type Podcaster = object
   downloader: Downloader
@@ -34,9 +35,10 @@ type Config = object
 type ClassifiedTask[T] = object
   source: Task
 
-proc new_items_collector*[T](u: T): ItemsCollector[T] =
+proc new_items_collector*[T](u: T, performer_from_title: bool): ItemsCollector[T] =
   result.url = u
   result.cache = new_cache (u.string.match url_regex u).get.captures[0]
+  result.performer_from_title = performer_from_title
 
 proc on_uploaded*[T](
     items_collector: var ItemsCollector[T],
@@ -49,7 +51,14 @@ proc on_uploaded*[T](
     downloaded.get.thumbnail_path.remove_temp_file
 
 proc process_task[T](podcaster: Podcaster, task: ClassifiedTask[T]) =
-  var collector = new_items_collector task.source.url.T
+  var collector = new_items_collector(
+    task.source.url.T,
+    performer_from_title =
+      if task.source.performer_from_title.is_some:
+        task.source.performer_from_title.get
+      else:
+        false,
+  )
   lvl_debug.log "process task " & $task
 
   if task.source.start_after_url.is_some:
