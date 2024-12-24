@@ -16,7 +16,8 @@ var recoverable_error_output_substring* =
 var fatal_error_output_substrings* =
   @[
     "No video formats found!;", "The page doesn't contain any tracks;",
-    "Sign in to confirm your age",
+    "Sign in to confirm your age", ": Premieres in ",
+    ": Requested format is not available",
   ]
 
 type CommandProcess = object
