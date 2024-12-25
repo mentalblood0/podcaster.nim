@@ -62,11 +62,12 @@ proc download_thumbnail*(downloader: Downloader, url: string, id: string): strin
     possible_original_paths.filter(file_exists)[0]
   let converted_path = (&"{id}_c.png").new_temp_file
   discard "ffmpeg".execute @["-i", original_path, converted_path]
+  let s = downloader.thumbnail_scale_size
   discard "ffmpeg".execute @[
     "-i",
     converted_path,
     "-vf",
-    &"scale={downloader.thumbnail_scale_width}:-1",
+    &"scale={s}:{s}:force_original_aspect_ratio=increase,crop={s}:{s}",
     scaled_path,
   ]
   original_path.remove_temp_file
