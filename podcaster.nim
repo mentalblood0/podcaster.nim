@@ -82,10 +82,11 @@ proc process_task[T](podcaster: Podcaster, task: ClassifiedTask[T]) =
     collector.on_uploaded(item, some(downloaded))
 
 when is_main_module:
+  let configs_dir = get_config_dir() / "podcaster"
+  echo &"will look for configs at directory {configs_dir}"
+
   for config_name in command_line_params():
-    let config = (
-      parse_json read_file get_config_dir() / "podcaster" / config_name & ".json"
-    ).to Config
+    let config = (parse_json read_file configs_dir / config_name & ".json").to Config
 
     ytdlp_proxy = config.ytdlp_proxy
     temp_files_dir = config.temp_files_dir

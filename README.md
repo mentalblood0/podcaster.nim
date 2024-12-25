@@ -8,6 +8,10 @@ Fast and stable bandcamp/youtube to telegram audio uploader
 nim c -d:ssl -d:release podcaster.nim
 ```
 
+### Storage
+
+Launch built binary and it will tell where you should put configuration files to
+
 ### Example
 
 Config at `~/.config/podcaster/bandcamp_music.json`:
