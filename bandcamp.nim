@@ -80,6 +80,7 @@ iterator items*(items_collector: var ItemsCollector[BandcampUrl]): Item =
               "--flat-playlist", "--print", "url", "--proxy", "", au
             ]
           except CommandFatalError:
+            items_collector.cache.incl au.album_cache_item
             continue
         tracks_urls_output_lines.filter (l: string) => l.starts_with "http"
 
@@ -92,7 +93,12 @@ iterator items*(items_collector: var ItemsCollector[BandcampUrl]): Item =
       ]
 
       let decoupled = decouple_performer_and_title(
-        performer = track_info_output_lines[0], title = track_info_output_lines[1]
+        performer =
+          if track_info_output_lines[0] == "Various Artists":
+            ""
+          else:
+            track_info_output_lines[0],
+        title = track_info_output_lines[1],
       )
       yield Item(
         url: tu,
