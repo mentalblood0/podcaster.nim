@@ -42,7 +42,7 @@ proc decouple_performer_and_title*(
     if splitted.len == 1:
       return (performer: none(string), title: t)
     else:
-      p = splitted[0].strip
-      t = splitted[1].strip
+      p = splitted[0]
+      t = splitted[1]
 
   return (performer: some(p), title: strip t.replace p & " -")
