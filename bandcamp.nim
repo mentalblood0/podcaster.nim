@@ -93,12 +93,7 @@ iterator items*(items_collector: var ItemsCollector[BandcampUrl]): Item =
       ]
 
       let decoupled = decouple_performer_and_title(
-        performer =
-          if track_info_output_lines[0] == "Various Artists":
-            ""
-          else:
-            track_info_output_lines[0],
-        title = track_info_output_lines[1],
+        performer = track_info_output_lines[0], title = track_info_output_lines[1]
       )
       yield Item(
         url: tu,
