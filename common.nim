@@ -34,8 +34,8 @@ var ytdlp_proxy* = ""
 proc decouple_performer_and_title*(
     performer: string, title: string
 ): tuple[performer: Option[string], title: string] =
-  var p = performer.replace(re"Various Artists *(?:-|—)? *", "").strip
-  var t = title.replace(re"Various Artists *(?:-|—)? *", "").strip
+  var p = performer.replace(re"Various Artists? *(?:-|—)? *", "").strip
+  var t = title.replace(re"Various Artists? *(?:-|—)? *", "").strip
 
   if p in ["", "NA"]:
     let splitted = t.split(re"-|—", 1).map (s: string) => s.strip
