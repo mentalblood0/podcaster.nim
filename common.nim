@@ -3,7 +3,7 @@
 # by the University of Cambridge, England. Source can be found at
 # ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/
 
-import std/[options, strutils, sugar, sequtils, json, nre, strformat, logging]
+import std/[options, strutils, sugar, sequtils, json, nre]
 
 import cache
 
@@ -34,10 +34,8 @@ var ytdlp_proxy* = ""
 proc decouple_performer_and_title*(
     performer: string, title: string
 ): tuple[performer: Option[string], title: string] =
-  lvl_info.log &"'{performer}', '{title}'"
   var p = performer.replace(re"Various Artists *(?:-|—)? *", "").strip
   var t = title.replace(re"Various Artists *(?:-|—)? *", "").strip
-  lvl_info.log(&"replaced: '{p}', '{t}'")
 
   if p in ["", "NA"]:
     let splitted = t.split(re"-|—", 1).map (s: string) => s.strip
