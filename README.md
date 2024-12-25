@@ -1,6 +1,12 @@
 ## podcaster.nim
 
-Fast and stable bandcamp/youtube to telegram audio uploader
+Fast and stable Bandcamp/Youtube to Telegram audio uploader
+
+### Dependencies
+
+`yt-dlp` and `ffmpeg`
+
+Also use tmpfs or analogous filesystem for temporary files storage to reduce your HDD/SSD wear and tear
 
 ### Build
 
@@ -14,7 +20,7 @@ Launch built binary and it will tell where you should put configuration files to
 
 ### Example
 
-Config at `~/.config/podcaster/bandcamp_music.json`:
+Configuration file `~/.config/podcaster/bandcamp_music.json`:
 
 ```Json
 {
@@ -43,7 +49,7 @@ Config at `~/.config/podcaster/bandcamp_music.json`:
 }
 ```
 
-Config at `~/.config/podcaster/youtube_music.json`:
+Configuration file `~/.config/podcaster/youtube_music.json`:
 
 ```Json
 {
@@ -87,3 +93,7 @@ Launch:
 ```Bash
 podcaster bandcamp_music youtube_music
 ```
+
+### Restoring uploaded items identifiers
+
+Use `start_after_url` task key. It should be album URL for Bandcamp and video URL for Youtube
