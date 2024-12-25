@@ -11,7 +11,7 @@ type ConversionParams* = object
 type Downloader* = object
   bitrate*: Option[int]
   conversion_params*: Option[ConversionParams]
-  thumbnail_scale_width*: int
+  thumbnail_scale_size*: int
 
 proc download_audio*(downloader: Downloader, url: string, use_proxy: bool): string =
   let id = ($url.hash).strip(trailing = false, chars = {'-'})
