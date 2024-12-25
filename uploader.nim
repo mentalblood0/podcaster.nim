@@ -10,6 +10,8 @@ import commands
 
 const max_uploaded_audio_size = 1024 * 1024 * 48
 
+var default_http_client* = new_http_client()
+
 type Uploader* = object
   token: string
 
@@ -81,11 +83,11 @@ proc upload*(uploader: Uploader, item: Item, downloaded: Downloaded, chat_id: st
     var response: Response
     while true:
       try:
-        response = new_http_client().request(
-            "https://api.telegram.org/bot" & uploader.token & "/sendAudio",
-            http_method = HttpPost,
-            multipart = multipart,
-          )
+        response = default_http_client.request(
+          "https://api.telegram.org/bot" & uploader.token & "/sendAudio",
+          http_method = HttpPost,
+          multipart = multipart,
+        )
         break
       except:
         lvl_warn.log &"exception during sending request to telegram: {get_current_exception().msg}"
@@ -96,4 +98,5 @@ proc upload*(uploader: Uploader, item: Item, downloaded: Downloaded, chat_id: st
         sleep(1000)
       continue
     break
+  default_http_client.close()
   downloaded.audio_path.remove_temp_file
