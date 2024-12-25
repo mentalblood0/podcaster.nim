@@ -3,7 +3,7 @@
 # by the University of Cambridge, England. Source can be found at
 # ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/
 
-import std/[options, strutils, sugar, sequtils, json, nre]
+import std/[options, strutils, sugar, sequtils, json, nre, strformat, logging]
 
 import cache
 
@@ -31,18 +31,20 @@ type
 
 var ytdlp_proxy* = ""
 
-func decouple_performer_and_title*(
+proc decouple_performer_and_title*(
     performer: string, title: string
 ): tuple[performer: Option[string], title: string] =
-  var p = performer
-  var t = title
+  lvl_info.log &"'{performer}', '{title}'"
+  var p = performer.replace(re"Various Artists *(?:-|—)? *", "").strip
+  var t = title.replace(re"Various Artists *(?:-|—)? *", "").strip
+  lvl_info.log(&"replaced: '{p}', '{t}'")
 
-  if performer in ["", "NA"]:
-    let splitted = title.split(re"-|—", 1).map (s: string) => s.strip
+  if p in ["", "NA"]:
+    let splitted = t.split(re"-|—", 1).map (s: string) => s.strip
     if splitted.len == 1:
-      return (performer: none(string), title: title.strip)
+      return (performer: none(string), title: t)
     else:
-      p = splitted[0]
-      t = splitted[1]
+      p = splitted[0].strip
+      t = splitted[1].strip
 
-  return (performer: some(p.strip), title: strip t.strip.replace p.strip & " -")
+  return (performer: some(p), title: strip t.replace p & " -")
