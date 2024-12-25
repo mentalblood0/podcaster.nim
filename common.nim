@@ -1,4 +1,9 @@
-import std/[options, strutils, sugar, sequtils, json]
+# Regular expression support is provided by the PCRE library package,
+# which is open source software, written by Philip Hazel, and copyright
+# by the University of Cambridge, England. Source can be found at
+# ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/
+
+import std/[options, strutils, sugar, sequtils, json, nre]
 
 import cache
 
@@ -33,7 +38,7 @@ func decouple_performer_and_title*(
   var t = title
 
   if performer in ["", "NA"]:
-    let splitted = title.split("-", 1).map (s: string) => s.strip
+    let splitted = title.split(re"-|—", 1).map (s: string) => s.strip
     if splitted.len == 1:
       return (performer: none(string), title: title.strip)
     else:
