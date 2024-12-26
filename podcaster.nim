@@ -93,7 +93,8 @@ when is_main_module:
     ytdlp_proxy = config.ytdlp_proxy
     temp_files_dir = config.temp_files_dir
 
-    add_handler new_console_logger(fmt_str = "$date $time $levelname ")
+    let log_handler = new_console_logger(fmt_str = "$date $time $levelname ")
+    add_handler log_handler
     case config.log_level
     of "debug":
       set_log_filter lvl_debug
@@ -113,3 +114,5 @@ when is_main_module:
       except:
         remove_temp_files()
         raise
+
+    remove_handler log_handler
