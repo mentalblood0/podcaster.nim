@@ -1,4 +1,4 @@
-import std/[sets, syncio, json, strformat, logging, os]
+import std/[sets, syncio, json, os]
 
 let cache_dir* = get_data_dir() / "podcaster"
 
@@ -8,7 +8,6 @@ type Cache* = object
 
 proc new_cache*(name: string): Cache =
   result.path = cache_dir / name & ".txt"
-  lvl_info.log &"store uploaded items identifiers at {result.path}"
   if file_exists result.path:
     for l in lines result.path:
       result.items.incl parse_json l
