@@ -86,6 +86,7 @@ when is_main_module:
     echo &"provide configs names as arguments"
     echo &"will look for configs at directory {configs_dir}"
     echo &"will store uploaded items identifiers at directory {cache_dir}"
+    quit()
 
   for config_name in command_line_params():
     let config = (parse_json read_file configs_dir / config_name & ".json").to Config
@@ -110,7 +111,7 @@ when is_main_module:
         elif is_some t.url.match t.url.YoutubeUrl.url_regex:
           config.podcaster.process_task ClassifiedTask[YoutubeUrl](source: t)
         else:
-          raise new_exception(UnsupportedUrlError, &"No module support url '{t.url}'")
+          raise new_exception(UnsupportedUrlError, &"No module support URL '{t.url}'")
       except:
         remove_temp_files()
         raise
