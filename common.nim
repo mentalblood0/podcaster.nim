@@ -3,7 +3,7 @@
 # by the University of Cambridge, England. Source can be found at
 # ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/
 
-import std/[options, strutils, sugar, sequtils, json, nre]
+import std/[options, strutils, sugar, sequtils, json, nre, os]
 
 import cache
 
@@ -30,6 +30,7 @@ type
   UnsupportedUrlError* = object of ValueError
 
 var ytdlp_proxy* = ""
+let configs_dir* = get_config_dir() / "podcaster"
 
 proc decouple_performer_and_title*(
     performer: string, title: string

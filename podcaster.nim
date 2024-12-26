@@ -82,8 +82,10 @@ proc process_task[T](podcaster: Podcaster, task: ClassifiedTask[T]) =
     collector.on_uploaded(item, some(downloaded))
 
 when is_main_module:
-  let configs_dir = get_config_dir() / "podcaster"
-  echo &"will look for configs at directory {configs_dir}"
+  if param_str(1) in ["-h", "--help"]:
+    echo &"provide configs names as arguments"
+    echo &"will look for configs at directory {configs_dir}"
+    echo &"will store uploaded items identifiers at directory {cache_dir}"
 
   for config_name in command_line_params():
     let config = (parse_json read_file configs_dir / config_name & ".json").to Config

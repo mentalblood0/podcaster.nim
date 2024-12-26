@@ -1,17 +1,19 @@
-import std/[files, dirs, appdirs, sets, paths, syncio, json, strformat, logging]
+import std/[sets, syncio, json, strformat, logging, os]
+
+let cache_dir* = get_data_dir() / "podcaster"
 
 type Cache* = object
   items: HashSet[JsonNode]
   path: string
 
 proc new_cache*(name: string): Cache =
-  result.path = (get_data_dir() / "podcaster".Path / name.Path).string & ".txt"
+  result.path = cache_dir / name & ".txt"
   lvl_info.log &"store uploaded items identifiers at {result.path}"
-  if file_exists result.path.Path:
+  if file_exists result.path:
     for l in lines result.path:
       result.items.incl parse_json l
   else:
-    create_dir result.path.Path.split_path.head
+    create_dir cache_dir
 
 proc incl*(cache: var Cache, item: JsonNode) =
   if item notin cache.items:

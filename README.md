@@ -14,11 +14,13 @@ Also use tmpfs or analogous filesystem for temporary files storage to reduce you
 nim c -d:ssl -d:release podcaster.nim
 ```
 
-### Storage
+### Usage
 
-Launch built binary and it will tell where you should put configuration files to
+```bash
+podcaster --help
+```
 
-### Example
+### Configuration
 
 Configuration file `~/.config/podcaster/bandcamp_music.json`:
 
