@@ -87,10 +87,21 @@ iterator items*(items_collector: var ItemsCollector[BandcampUrl]): Item =
     for i, tu in enumerate tracks_urls:
       if tu.track_cache_item in items_collector.cache:
         continue
-      let track_info_output_lines = split_lines "yt-dlp".execute @[
-        "--skip-download", "--print", "uploader", "--print", "title", "--print",
-        "duration", "--proxy", "", tu,
-      ]
+      let cache_items =
+        if (i == tracks_urls.len - 1) and not single:
+          @[tu.track_cache_item, au.album_cache_item]
+        else:
+          @[tu.track_cache_item]
+      var track_info_output_lines: seq[string]
+      try:
+        track_info_output_lines = split_lines "yt-dlp".execute @[
+          "--skip-download", "--print", "uploader", "--print", "title", "--print",
+          "duration", "--proxy", "", tu,
+        ]
+      except CommandFatalError:
+        for c in cache_items:
+          items_collector.cache.incl c
+        continue
 
       let decoupled = decouple_performer_and_title(
         performer = track_info_output_lines[0], title = track_info_output_lines[1]
@@ -100,11 +111,7 @@ iterator items*(items_collector: var ItemsCollector[BandcampUrl]): Item =
         performer: decoupled.performer,
         title: decoupled.title,
         duration: int parse_float track_info_output_lines[2],
-        cache_items:
-          if (i == tracks_urls.len - 1) and not single:
-            @[tu.track_cache_item, au.album_cache_item]
-          else:
-            @[tu.track_cache_item],
+        cache_items: cache_items,
         thumbnail_id: thumbnail_id,
         keep_thumbnail: i != tracks_urls.len - 1,
         need_proxy: false,
