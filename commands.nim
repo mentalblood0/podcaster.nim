@@ -19,6 +19,7 @@ var fatal_error_output_substrings* =
     "Sign in to confirm your age", ": Premieres in ",
     ": Requested format is not available",
     "Postprocessing: Error opening output files: Invalid argument",
+    "members-only content like this video",
   ]
 
 type CommandProcess = object
