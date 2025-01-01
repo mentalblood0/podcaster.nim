@@ -11,6 +11,7 @@ var recoverable_error_output_substring* =
     "SSL: UNEXPECTED_EOF_WHILE_READING", "Unable to connect to proxy",
     "Read timed out.", "Unable to fetch PO Token for mweb client", "IncompleteRead",
     "Remote end closed connection without response", "Cannot connect to proxy.",
+    "Failed to establish a new connection: [Errno -3] Temporary failure in name resolution",
   ]
 
 var fatal_error_output_substrings* =
