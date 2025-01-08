@@ -12,6 +12,7 @@ var recoverable_error_output_substring* =
     "Read timed out.", "Unable to fetch PO Token for mweb client", "IncompleteRead",
     "Remote end closed connection without response", "Cannot connect to proxy.",
     "Temporary failure in name resolution", "timed out. (connect timeout",
+    "Connection reset by peer",
   ]
 
 var fatal_error_output_substrings* =
