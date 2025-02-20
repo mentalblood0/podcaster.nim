@@ -16,7 +16,7 @@ type
 
 proc url_regex*(url: YoutubeUrl): Regex =
   return
-    re"https?:\/\/(?:www\.)?youtube\.com\/@?((?:\w|\.|-)+)\/(?:(?:videos)|(?:playlist\?list=(?:\w|-)+))\/?$"
+    re"https?:\/\/(?:www\.)?youtube\.com\/(?:@?|playlist\?list=)((?:\w|\.|-)+)\/?(?:\/videos)?\/?$"
 
 func cache_item(ii: IntermediateItem): JsonNode =
   %*{"title": ii.title, "duration": ii.duration}
