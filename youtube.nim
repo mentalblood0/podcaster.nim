@@ -32,10 +32,13 @@ proc get_intermediate_items(
   ).split_lines
   var i = 0
   while i + 2 < output_lines.len:
+    let duration_string = output_lines[i + 2]
+    if duration_string == "NA":
+      continue
     let ii = (
       url: output_lines[i],
       title: output_lines[i + 1],
-      duration: int parse_float output_lines[i + 2],
+      duration: int parse_float duration_string,
     )
     if ii.cache_item notin items_collector.cache:
       result.incl ii
